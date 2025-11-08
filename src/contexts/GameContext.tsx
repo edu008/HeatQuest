@@ -190,7 +190,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useGame = () => {
   const context = useContext(GameContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useGame must be used within GameProvider");
   }
   return context;

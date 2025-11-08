@@ -64,15 +64,22 @@ function LocationMarker() {
 const MapView = () => {
   const { missions, setActiveMission, user } = useGame();
   const navigate = useNavigate();
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // Fix for default markers in react-leaflet
   useEffect(() => {
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-      iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-      shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-    });
+    try {
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      });
+      setIsMapReady(true);
+    } catch (error) {
+      console.error("Error setting up Leaflet icons:", error);
+      setIsMapReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -80,6 +87,10 @@ const MapView = () => {
       navigate("/");
     }
   }, [user, navigate]);
+
+  if (!isMapReady) {
+    return <div className="h-screen w-full flex items-center justify-center">Loading map...</div>;
+  }
 
   const handleMissionClick = (mission: any) => {
     setActiveMission(mission);
