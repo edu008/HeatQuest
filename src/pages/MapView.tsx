@@ -1,15 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useGame } from "@/contexts/GameContext";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
-import { Camera, MapPin } from "lucide-react";
+import { Camera } from "lucide-react";
+import MapboxMap from "@/components/MapboxMap";
 
 const MapView = () => {
   const { missions, setActiveMission, user } = useGame();
   const navigate = useNavigate();
+  const [mapboxToken, setMapboxToken] = useState<string>(() => localStorage.getItem("mapbox_public_token") || "");
+  const handleSaveToken = () => {
+    localStorage.setItem("mapbox_public_token", mapboxToken);
+  };
 
   useEffect(() => {
     if (!user) {
@@ -49,58 +55,33 @@ const MapView = () => {
         </div>
       </motion.div>
 
-      {/* Temporary Map Placeholder - Proof of Concept */}
-      <div className="flex-1 bg-muted p-4 overflow-y-auto">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <div className="text-center py-8">
-            <MapPin className="w-16 h-16 mx-auto mb-4 text-primary" />
-            <h2 className="text-xl font-bold mb-2">Deine Missionen</h2>
-            <p className="text-sm text-muted-foreground">
-              Proof of Concept - Kartenansicht kommt später
-            </p>
-          </div>
-
-          <div className="grid gap-4">
-            {missions.map((mission) => (
-              <Card
-                key={mission.id}
-                className="p-4 rounded-3xl cursor-pointer hover:shadow-lg transition-all"
-                onClick={() => handleMissionClick(mission)}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-heat to-heat-intense flex items-center justify-center text-2xl flex-shrink-0">
-                    {mission.completed ? "✅" : "🚩"}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-1">{mission.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {mission.description}
-                    </p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex-1 bg-muted rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-heat to-heat-intense h-full rounded-full"
-                          style={{ width: `${mission.heatRisk}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-bold text-heat">
-                        {mission.heatRisk}%
-                      </span>
-                    </div>
-                    <Button
-                      size="sm"
-                      disabled={mission.completed}
-                      className="rounded-xl"
-                    >
-                      {mission.completed ? "Abgeschlossen" : "Mission starten"}
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+      {/* Map Area */}
+      {mapboxToken ? (
+        <div className="h-full w-full">
+          <MapboxMap token={mapboxToken} missions={missions} onMissionClick={handleMissionClick} />
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 h-full w-full flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-6 rounded-3xl space-y-4">
+            <h2 className="text-xl font-bold">Mapbox Token</h2>
+            <p className="text-sm text-muted-foreground">
+              Füge deinen Mapbox Public Token ein, um die Karte zu laden.
+            </p>
+            <Input
+              placeholder="pk.eyJ1Ijo..."
+              value={mapboxToken}
+              onChange={(e) => setMapboxToken(e.target.value)}
+              className="rounded-xl"
+            />
+            <Button onClick={handleSaveToken} disabled={!mapboxToken.trim()} className="w-full rounded-xl">
+              Karte anzeigen
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Du findest den Token unter mapbox.com → Tokens.
+            </p>
+          </Card>
+        </div>
+      )}
 
       <BottomNav />
     </div>
