@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useGame } from "@/contexts/GameContext";
 import { ArrowLeft, MapPin } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 const MissionDetail = () => {
   const { id } = useParams();
@@ -36,12 +36,18 @@ const MissionDetail = () => {
 
   const handleComplete = () => {
     if (checkedActions.size === 0) {
-      toast.error("Bitte wähle mindestens eine Aktion aus!");
+      toast({
+        title: "Bitte wähle mindestens eine Aktion aus!",
+        variant: "destructive",
+      });
       return;
     }
 
     completeMission(mission.id);
-    toast.success("Mission abgeschlossen! 🎉 +100 XP");
+    toast({
+      title: "Mission abgeschlossen! 🎉",
+      description: "+100 XP",
+    });
     navigate("/profile");
   };
 

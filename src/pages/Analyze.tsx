@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { useGame } from "@/contexts/GameContext";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Upload, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 interface AnalysisResult {
   is_hotspot: boolean;
@@ -63,9 +63,13 @@ const Analyze = () => {
     setAnalyzing(false);
 
     if (mockResult.is_hotspot) {
-      toast.success("Hotspot gefunden! 🔥");
+      toast({
+        title: "Hotspot gefunden! 🔥",
+      });
     } else {
-      toast.info("Kein kritischer Hotspot erkannt.");
+      toast({
+        title: "Kein kritischer Hotspot erkannt.",
+      });
     }
   };
 
@@ -89,7 +93,9 @@ const Analyze = () => {
         };
 
         addMission(newMission);
-        toast.success("Mission erstellt! 🚀");
+        toast({
+          title: "Mission erstellt! 🚀",
+        });
         navigate(`/mission/${newMission.id}`);
       });
     }
