@@ -1,213 +1,140 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useGame } from "@/contexts/GameContext";
-import { ArrowLeft, MapPin, CheckCircle2, Flame, Sparkles, Target, Clock, FileText, Camera, Flag } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+  ArrowLeft,
+  MapPin,
+  CheckCircle2,
+  Flame,
+  Sparkles,
+  Target,
+  Clock,
+  FileText,
+} from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
-const MissionDetail = () => {
+export default function MissionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { missions, completeMission } = useGame();
 
-  const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
-  const [actionProofs, setActionProofs] = useState<Record<number, string>>({});
-  const [pendingProofIndex, setPendingProofIndex] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploadPromptOpen, setUploadPromptOpen] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const [showEntryPop, setShowEntryPop] = useState(true);
-
-  // Entry pop effect
-  useEffect(() => {
-    setShowEntryPop(true);
-    const tmr = setTimeout(() => setShowEntryPop(false), 900);
-    return () => clearTimeout(tmr);
-  }, [id]);
-
-  const mission = missions.find((m) => m.id === id);
+  const mission = useMemo(() => missions.find((m) => m.id === id), [missions, id]);
 
   useEffect(() => {
-    if (!mission) {
-      navigate("/map");
-      return;
-    }
+    if (!mission) navigate("/map");
   }, [mission, navigate]);
+
+  const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
 
   if (!mission) return null;
 
   const toggleAction = (index: number) => {
     setCheckedActions((prev) => {
       const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-        return next;
-      }
-      // Require photo proof before marking as done
-      if (actionProofs[index]) {
-        next.add(index);
-        return next;
-      }
-      setPendingProofIndex(index);
-      setUploadPromptOpen(true);
-      return prev; // unchanged until proof added
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
     });
-  };
-
-  const handleActionProofSelected = (file: File, actionIndex: number) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = reader.result as string;
-      setActionProofs((prev) => ({ ...prev, [actionIndex]: url }));
-      toast({ title: "Photo added ✅" });
-      setCheckedActions((prev) => {
-        const next = new Set(prev);
-        next.add(actionIndex);
-        return next;
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleComplete = () => {
-    if (checkedActions.size === 0) {
-<<<<<<< Updated upstream
-      toast({ title: "Select at least one action", variant: "destructive" });
-      return;
-    }
-    const missingProof = Array.from(checkedActions).some((i) => !actionProofs[i]);
-    if (missingProof) {
-      toast({ title: "Please add photos for checked actions", variant: "destructive" });
-=======
-      toast({
-        title: "Please select at least one action!",
-        variant: "destructive",
-      });
->>>>>>> Stashed changes
-      return;
-    }
-    completeMission(mission.id);
-<<<<<<< Updated upstream
-    toast({ title: "Mission completed! 🎉", description: "+100 XP" });
-=======
-    toast({
-      title: "Mission completed! 🎉",
-      description: "+100 XP",
-    });
->>>>>>> Stashed changes
-    navigate("/profile");
   };
 
   const completionPercentage = (checkedActions.size / mission.actions.length) * 100;
-  const timeEstimate = mission.actions.length * 5; // minutes
-  const handleOpenCamera = () => fileInputRef.current?.click();
+  const estMinutes = mission.timeMinutes || 15;
+
+  const handleComplete = () => {
+    if (checkedActions.size === 0) {
+      toast({ title: "Select at least one action", description: "Pick actions you completed." });
+      return;
+    }
+    completeMission(mission.id);
+    toast({ title: "Mission completed!", description: "Great job reducing heat here." });
+    navigate("/map");
+  };
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-background">
-      {/* Entry pop overlay */}
-      <AnimatePresence>
-        {showEntryPop && (
-          <motion.div
-            className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            <motion.div
-              className="relative rounded-full p-5 bg-gradient-to-br from-orange-500 via-orange-500/90 to-rose-500 shadow-lg ring-8 ring-orange-500/25"
-              initial={{ scale: 0.7 }}
-              animate={{ scale: 1.06 }}
-              exit={{ scale: 1.15 }}
-              transition={{ type: "spring", stiffness: 320, damping: 18 }}
-            >
-              <Flag className="h-8 w-8 text-white" />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="p-4 max-w-xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="h-4 w-4" /> Unknown location
+        </div>
+      </div>
 
-      <motion.div
-        className="mx-auto h-full max-w-2xl p-3 grid grid-rows-[auto,auto,1fr,auto] gap-3"
-        initial={{ opacity: 0, scale: 0.98, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-2 py-2">
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            <span>{mission.locationName || "Unknown location"}</span>
+      {/* Title and heat badge */}
+      <Card className="p-6 rounded-3xl mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">{mission.title}</h1>
+            <p className="text-sm text-muted-foreground">{mission.description}</p>
+          </div>
+          <div className="flex items-center gap-2 text-heat">
+            <Flame className="h-5 w-5" />
+            <span className="text-sm">{mission.riskLevel || 78}%</span>
           </div>
         </div>
 
-        {/* Title, heat badge and compact progress */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-base font-semibold truncate">{mission.title}</h1>
-            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-2 py-1 text-xs text-orange-700">
-              <Flame className="h-4 w-4" />
-              <span>{mission.heatRisk}%</span>
-            </div>
+        {/* Progress bar */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+            <span>Completion</span>
+            <span>{Math.min(100, Math.round(completionPercentage))}%</span>
           </div>
-<<<<<<< Updated upstream
           <div className="w-full h-2 rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary via-heat to-cool-intense"
               style={{ width: `${Math.min(100, Math.round(completionPercentage))}%` }}
             />
-=======
+          </div>
+        </div>
+      </Card>
+
+      {/* Compact stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <Card className="p-3 rounded-2xl text-center">
+          <div className="flex items-center justify-center gap-1 text-sm">
+            <Sparkles className="h-4 w-4" />
+            <span>+{mission.rewardXp || 100} XP</span>
+          </div>
+        </Card>
+        <Card className="p-3 rounded-2xl text-center">
+          <div className="flex items-center justify-center gap-1 text-sm">
+            <Target className="h-4 w-4" />
+            <span>{mission.actions.length} steps</span>
+          </div>
+        </Card>
+        <Card className="p-3 rounded-2xl text-center">
+          <div className="flex items-center justify-center gap-1 text-sm">
+            <Clock className="h-4 w-4" />
+            <span>{estMinutes} min</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Main content */}
+      <div className="grid gap-4">
+        <Card className="p-6 rounded-3xl">
+          <div className="flex items-center gap-2 mb-2">
+            <FileText className="h-4 w-4" />
+            <h2 className="font-semibold">Context</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">{mission.context}</p>
         </Card>
 
-        {/* Reasons */}
         <Card className="p-6 rounded-3xl">
-          <h2 className="font-semibold mb-3">Why is it hot here? 🔥</h2>
-          <ul className="space-y-3">
-            {mission.reasons.map((reason, i) => (
-              <motion.li
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl"
-              >
-                <span className="text-heat text-xl">🔥</span>
-                <span className="flex-1 text-sm">{reason}</span>
-              </motion.li>
-            ))}
-          </ul>
-        </Card>
-
-        {/* Actions Checklist */}
-        <Card className="p-6 rounded-3xl">
-          <h2 className="font-semibold mb-3">Your Actions ✅</h2>
+          <h2 className="font-semibold mb-3">Actions</h2>
           <div className="space-y-3">
             {mission.actions.map((action, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.05 }}
                 className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl hover:bg-muted transition-colors cursor-pointer"
                 onClick={() => toggleAction(i)}
               >
@@ -219,147 +146,20 @@ const MissionDetail = () => {
                 <span className="flex-1 text-sm">{action}</span>
               </motion.div>
             ))}
->>>>>>> Stashed changes
           </div>
-          {/* Compact stats row */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium">+100 XP</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-2">
-              <Target className="h-4 w-4 text-accent" />
-              <span className="text-xs font-medium">{mission.actions.length} steps</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium">{timeEstimate} min</span>
-            </div>
-          </div>
-        </div>
+        </Card>
+      </div>
 
-<<<<<<< Updated upstream
-        {/* Main content compact grid */}
-        <div className="grid grid-rows-2 gap-3">
-          {/* Description card */}
-          <div className="rounded-xl border bg-card p-3 shadow-sm">
-            <div className="mb-2 text-sm font-medium">Context</div>
-            <div className="flex items-start gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-              <p className="text-sm text-muted-foreground leading-snug break-words max-h-20 overflow-hidden">
-                {mission.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="rounded-xl border bg-card p-3 shadow-sm">
-            <div className="mb-2 text-sm font-medium">Actions</div>
-            <ul className="grid grid-cols-2 gap-2">
-              {mission.actions.map((action, index) => {
-                const isChecked = checkedActions.has(index);
-                return (
-                  <li key={index} className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2 py-2 overflow-hidden">
-                    <label className="flex items-center gap-2 min-w-0 flex-1">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border shrink-0"
-                        checked={isChecked}
-                        onChange={() => toggleAction(index)}
-                      />
-                      <span className="text-xs truncate min-w-0">{action}</span>
-                    </label>
-                    <span className={isChecked ? "shrink-0 text-[10px] px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200" : "shrink-0 text-[10px] px-2 py-1 rounded-full bg-muted text-muted-foreground border"}>
-                      {isChecked ? "Done" : "Todo"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="grid grid-cols-1 gap-2 -mt-2 py-12">
-          <motion.button
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-4 text-base font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
-            disabled={checkedActions.size === 0 || !Array.from(checkedActions).every((i) => !!actionProofs[i])}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            animate={completing ? { scale: 1.03 } : { scale: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            onClick={() => {
-              if (checkedActions.size === 0 || !Array.from(checkedActions).every((i) => !!actionProofs[i])) return;
-              setCompleting(true);
-              setTimeout(() => {
-                handleComplete();
-                setCompleting(false);
-              }, 180);
-            }}
-          >
-            <CheckCircle2 className="h-5 w-5" />
-            Complete Mission
-          </motion.button>
-          {/* Hidden file input for action proofs */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file && pendingProofIndex !== null) {
-                handleActionProofSelected(file, pendingProofIndex);
-                setPendingProofIndex(null);
-                e.currentTarget.value = ""; // reset input
-              }
-            }}
-          />
-        </div>
-
-        {/* Upload prompt dialog */}
-        <AlertDialog open={uploadPromptOpen} onOpenChange={setUploadPromptOpen}>
-          <AlertDialogContent className="max-w-sm">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5 text-orange-500" />
-                Photo required
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Please add photos for checked actions
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setUploadPromptOpen(false)} className="rounded-xl">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleOpenCamera} className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl">
-                Open Camera
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </motion.div>
-=======
-        {/* Complete Button */}
+      {/* Footer action */}
+      <div className="mt-6">
         <Button
+          className="w-full rounded-2xl h-12 text-base gap-2"
           onClick={handleComplete}
-          disabled={mission.completed || checkedActions.size === 0}
-          className="w-full h-14 text-lg rounded-2xl bg-gradient-to-r from-heat via-primary to-cool-intense hover:shadow-xl transition-all"
+          disabled={checkedActions.size === 0}
         >
-          {mission.completed ? (
-            "✅ Mission completed"
-          ) : allActionsChecked ? (
-            "🎉 Complete mission (+100 XP)"
-          ) : (
-            `Complete mission (${checkedActions.size}/${mission.actions.length})`
-          )}
+          <CheckCircle2 className="h-5 w-5" /> Complete Mission
         </Button>
       </div>
->>>>>>> Stashed changes
     </div>
   );
-};
-
-export default MissionDetail;
+}
