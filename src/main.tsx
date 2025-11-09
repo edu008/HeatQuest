@@ -6,13 +6,13 @@ import { GameProvider } from "./contexts/GameContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContextMock";
 
 import Login from "./pages/Login";
-import MapView from "./pages/MapView";
-import Analyze from "./pages/Analyze";
-import MissionDetail from "./pages/MissionDetail";
-import Profile from "./pages/Profile";
-import Leaderboard from "./pages/Leaderboard";
-import AuthCallback from "./pages/AuthCallback";
-import NotFound from "./pages/NotFound";
+const MapView = React.lazy(() => import("./pages/MapView"));
+const Analyze = React.lazy(() => import("./pages/Analyze"));
+const MissionDetail = React.lazy(() => import("./pages/MissionDetail"));
+const Profile = React.lazy(() => import("./pages/Profile"));
+const Leaderboard = React.lazy(() => import("./pages/Leaderboard"));
+const AuthCallback = React.lazy(() => import("./pages/AuthCallback"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 import "./index.css";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -34,16 +34,18 @@ const App = () => (
     <AuthProvider>
       <GameProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/map" element={<ProtectedRoute><MapView /></ProtectedRoute>} />
-            <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
-            <Route path="/mission/:id" element={<ProtectedRoute><MissionDetail /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/map" element={<ProtectedRoute><MapView /></ProtectedRoute>} />
+              <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
+              <Route path="/mission/:id" element={<ProtectedRoute><MissionDetail /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </React.Suspense>
         </BrowserRouter>
       </GameProvider>
     </AuthProvider>
