@@ -28,14 +28,15 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ token, missions, onMissionClick }
       attributionControl: true,
     });
 
-    mapRef.current.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
+    // Place controls away from the header
+    mapRef.current.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
 
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
       showUserHeading: true,
     });
-    mapRef.current.addControl(geolocate);
+    mapRef.current.addControl(geolocate, "bottom-right");
 
     // Attempt to center on user once available
     mapRef.current.once("load", () => {

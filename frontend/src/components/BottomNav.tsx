@@ -1,14 +1,16 @@
 import { Link, useLocation } from "react-router-dom";
 import { Map, Trophy, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/contexts/I18nContext";
 
 const BottomNav = () => {
   const location = useLocation();
+  const { t } = useI18n();
 
   const navItems = [
-    { icon: Map, label: "Map", path: "/map" },
-    { icon: Trophy, label: "Rangliste", path: "/leaderboard" },
-    { icon: User, label: "Profil", path: "/profile" },
+    { icon: Map, label: t("map"), path: "/map" },
+    { icon: Trophy, label: t("leaderboard"), path: "/leaderboard" },
+    { icon: User, label: t("profile"), path: "/profile" },
   ];
 
   return (

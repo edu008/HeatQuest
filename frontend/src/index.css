@@ -93,3 +93,18 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Mapbox: hide default blue user accuracy circle overlay */
+.mapboxgl-user-location-accuracy-circle {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+/* Position Mapbox controls safely below header and above BottomNav */
+.mapboxgl-ctrl-top-right {
+  margin-top: 6rem; /* if any page still uses top-right */
+}
+.mapboxgl-ctrl-bottom-right {
+  margin-bottom: 6.5rem; /* nudge controls upward above BottomNav */
+  margin-right: 0.5rem;
+}

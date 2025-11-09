@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { useGame } from "@/contexts/GameContext";
 import BottomNav from "@/components/BottomNav";
 import { Trophy, Medal, Award } from "lucide-react";
+import { useI18n } from "@/contexts/I18nContext";
 
 // Mock leaderboard data
 const mockPlayers = [
@@ -15,6 +16,7 @@ const mockPlayers = [
 
 const Leaderboard = () => {
   const { user } = useGame();
+  const { t } = useI18n();
 
   const allPlayers = user
     ? [
@@ -50,8 +52,8 @@ const Leaderboard = () => {
         className="bg-gradient-to-r from-heat via-primary to-cool-intense p-6"
       >
         <div className="max-w-2xl mx-auto text-white">
-          <h1 className="text-3xl font-bold mb-2">🏆 Rangliste</h1>
-          <p className="text-white/90">Die Top Climate Warriors</p>
+          <h1 className="text-3xl font-bold mb-2">🏆 {t("leaderboard_title")}</h1>
+          <p className="text-white/90">{t("leaderboard_subtitle")}</p>
         </div>
       </motion.div>
 
@@ -92,15 +94,15 @@ const Leaderboard = () => {
                         {player.username}
                         {isCurrentUser && (
                           <span className="ml-2 text-xs bg-primary text-white px-2 py-1 rounded-full">
-                            Du
+                            {t("you")}
                           </span>
                         )}
                       </p>
                     </div>
                     <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                      <span>Level {player.level}</span>
+                      <span>{t("level_label")} {player.level}</span>
                       <span>•</span>
-                      <span>{player.missions} Missionen</span>
+                      <span>{player.missions} {t("missions_label")}</span>
                     </div>
                   </div>
 
@@ -109,7 +111,7 @@ const Leaderboard = () => {
                     <p className="text-2xl font-bold text-primary">
                       {player.xp}
                     </p>
-                    <p className="text-xs text-muted-foreground">XP</p>
+                    <p className="text-xs text-muted-foreground">{t("xp_label")}</p>
                   </div>
                 </div>
               </Card>

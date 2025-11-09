@@ -10,12 +10,14 @@ import BottomNav from "@/components/BottomNav";
 import { Camera, Loader2 } from "lucide-react";
 import MapboxMap from "@/components/MapboxMap";
 import { useHeatmap } from "@/hooks/useHeatmap";
+import { useI18n } from "@/contexts/I18nContext";
 
 const MapView = () => {
   const { missions, setActiveMission, user } = useGame();
   const { user: authUser, loading } = useAuth();
   const navigate = useNavigate();
   const { scanCurrentLocation, loading: scanLoading, data: heatmapData } = useHeatmap();
+  const { t } = useI18n();
   
   // Mapbox Token aus Environment Variable oder localStorage (Fallback)
   const envToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -64,7 +66,7 @@ const MapView = () => {
       <motion.div
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="absolute top-0 left-0 right-0 z-[1000] bg-gradient-to-b from-card/95 to-transparent backdrop-blur-sm p-4"
+        className="sticky top-0 z-[1000] w-full bg-card/95 backdrop-blur-sm p-4 shadow-sm"
       >
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <div>
@@ -72,7 +74,9 @@ const MapView = () => {
               HeatQuest
             </h1>
             <p className="text-sm text-muted-foreground">
-              {loading ? "Loading..." : `Hello, ${authUser?.user_metadata?.user_name || authUser?.email?.split('@')[0] || user?.username}! 👋`}
+              {loading
+                ? t("loading")
+                : t("hello_user", { name: authUser?.user_metadata?.user_name || authUser?.email?.split("@")[0] || user?.username || "" })}
             </p>
           </div>
           <Button
@@ -81,7 +85,7 @@ const MapView = () => {
             className="rounded-2xl bg-gradient-to-r from-heat to-primary hover:from-heat-intense hover:to-heat shadow-lg"
           >
             <Camera className="w-5 h-5 mr-2" />
-            Analyze
+            {t("analyze")}
           </Button>
         </div>
       </motion.div>
@@ -97,9 +101,9 @@ const MapView = () => {
             <div className="flex items-center space-x-3">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
               <div>
-                <h3 className="font-bold">Analyzing Area...</h3>
+                <h3 className="font-bold">{t("analyzing_area")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Checking if this area was already scanned
+                  {t("checking_area_cached")}
                 </p>
               </div>
             </div>
@@ -121,22 +125,22 @@ const MapView = () => {
             className="absolute top-24 left-4 right-4 z-[999] max-w-md"
           >
             <Card className="p-4 bg-card/95 backdrop-blur-sm">
-              <h3 className="font-bold mb-2">Area Analysis 🔥</h3>
+              <h3 className="font-bold mb-2">{t("area_analysis")}</h3>
               <div className="text-sm space-y-1">
-                <p>📊 Total Cells: {heatmapData.total_cells}</p>
-                <p>🔥 Hotspots: {hotspots.length}</p>
-                <p>🌡️ Avg Temp: {avgTemp.toFixed(1)}°C</p>
-                <p>🌿 Avg NDVI: {avgNdvi.toFixed(2)}</p>
+                <p>📊 {t("total_cells")}: {heatmapData.total_cells}</p>
+                <p>🔥 {t("hotspots")}: {hotspots.length}</p>
+                <p>🌡️ {t("avg_temp")}: {avgTemp.toFixed(1)}°C</p>
+                <p>🌿 {t("avg_ndvi")}: {avgNdvi.toFixed(2)}</p>
                 <p>
                   {heatmapData.from_cache ? (
-                    <span className="text-green-500">⚡ Previously scanned area</span>
+                    <span className="text-green-500">⚡ {t("previously_scanned")}</span>
                   ) : (
-                    <span className="text-blue-500">🆕 Newly scanned area</span>
+                    <span className="text-blue-500">🆕 {t("newly_scanned")}</span>
                   )}
                 </p>
                 {heatmapData.parent_cell_info && (
                   <p className="text-xs text-muted-foreground">
-                    📍 Scanned {heatmapData.parent_cell_info.total_scans} time(s) by community
+                    📍 {t("scanned_times", { count: heatmapData.parent_cell_info.total_scans })}
                   </p>
                 )}
               </div>
@@ -145,29 +149,27 @@ const MapView = () => {
         );
       })()}
 
-      {/* Map Area */}
+      {/* Map Area (push below header height ~6rem) */}
       {mapboxToken ? (
-        <div className="h-full w-full">
+        <div className="h-[calc(100dvh-5rem)] w-full">
           <MapboxMap token={mapboxToken} missions={missions} onMissionClick={handleMissionClick} />
         </div>
       ) : (
-        <div className="flex-1 h-full w-full flex items-center justify-center p-4">
+        <div className="h-[calc(100dvh-5rem)] w-full flex items-center justify-center p-4">
           <Card className="w-full max-w-md p-6 rounded-3xl space-y-4">
-            <h2 className="text-xl font-bold">Mapbox Token</h2>
-            <p className="text-sm text-muted-foreground">
-              Füge deinen Mapbox Public Token ein, um die Karte zu laden.
-            </p>
+            <h2 className="text-xl font-bold">{t("mapbox_token_title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("mapbox_token_desc")}</p>
             <Input
-              placeholder="pk.eyJ1Ijo..."
+              placeholder={t("token_placeholder")}
               value={mapboxToken}
               onChange={(e) => setMapboxToken(e.target.value)}
               className="rounded-xl"
             />
             <Button onClick={handleSaveToken} disabled={!mapboxToken.trim()} className="w-full rounded-xl">
-              Karte anzeigen
+              {t("show_map")}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Du findest den Token unter mapbox.com → Tokens.
+              {t("token_help")}
             </p>
           </Card>
         </div>
