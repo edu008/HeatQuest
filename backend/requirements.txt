@@ -16,3 +16,6 @@ mgrs==1.4.6
 folium==0.15.1
 branca==0.7.0
 rasterstats==0.19.0
+pillow==10.2.0
+google-auth==2.27.0
+google-cloud-aiplatform==1.38.0

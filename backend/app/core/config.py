@@ -22,8 +22,17 @@ class Settings(BaseSettings):
     # Landsat-Bucket
     landsat_bucket: str = "usgs-landsat"
     
-    # Mapbox API Token für Visualisierung
+    # Mapbox API Token für Visualisierung und Satellitenbilder
     map: Optional[str] = None
+    
+    # Vertex AI Configuration
+    vertex_service_account_path: str = "vertex-access.json"
+    vertex_location: str = "us-east4"  # Gemini-Modelle verfügbar (früher: us-central1)
+    
+    # Optional: Weitere Anbieter
+    google_maps_api_key: Optional[str] = None
+    google_gemini_api_key: Optional[str] = None  # Direkter Gemini API Zugriff (Alternative zu Vertex)
+    openai_api_key: Optional[str] = None
     
     # API-Einstellungen
     api_title: str = "HeatQuest API"

@@ -9,6 +9,7 @@ import logging
 
 from app.core.config import settings
 from app.api.v1.heatmap import router as heatmap_router
+from app.api.v1.location_description import router as location_description_router
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -38,6 +39,7 @@ app.add_middleware(
 
 # Router einbinden
 app.include_router(heatmap_router)
+app.include_router(location_description_router)
 
 
 @app.get("/", tags=["root"])
@@ -49,7 +51,22 @@ async def root():
         "message": "Willkommen bei der HeatQuest API",
         "version": settings.api_version,
         "docs": "/docs",
-        "redoc": "/redoc"
+        "redoc": "/redoc",
+        "services": {
+            "heatmap": {
+                "description": "Temperatur-Analyse und Heat Scores",
+                "endpoints": [
+                    "/api/v1/grid-heat-score-radius",
+                    "/api/v1/grid-heat-score-map-radius"
+                ]
+            },
+            "location_description": {
+                "description": "KI-basierte Standortbeschreibung aus Satellitenbildern",
+                "endpoints": [
+                    "/api/v1/describe-location"
+                ]
+            }
+        }
     }
 
 
