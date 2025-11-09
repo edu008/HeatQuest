@@ -1,17 +1,19 @@
 # 🔥 HeatQuest - Urban Heat Island Gamification
 
-Interactive application for analyzing and combating urban heat islands with gamification elements.
+Turn hot spots into cool spots! An interactive gamified application for discovering and combating urban heat islands.
 
 ## 📋 Project Overview
 
-**HeatQuest** combines satellite data (Landsat, Sentinel-2) with AI analysis and gamification to explore and document urban heat islands in a playful way.
+**HeatQuest** combines real-time satellite data analysis with AI-powered insights and gamification to make urban climate action engaging and fun.
 
 ### Key Features:
-- 🗺️ **Interactive Map** with real-time temperature analysis
-- 🛰️ **Satellite Data Integration** (Landsat 8/9, Sentinel-2)
-- 🤖 **AI Image Description** with Google Vertex AI (Gemini Vision)
-- 🎮 **Gamification** with missions and leaderboard
-- 📊 **Heatmap Visualization** with heat score calculation
+- 🗺️ **Interactive Heatmap** - Real-time temperature visualization with Mapbox
+- 🎯 **AI-Generated Missions** - Automatic mission creation from satellite hotspot detection
+- 🛰️ **Satellite Data Integration** - Landsat 8/9 for temperature, Sentinel-2 for vegetation (NDVI)
+- 🤖 **AI Analysis** - Google Vertex AI (Gemini Vision), OpenAI GPT-4 Vision for image analysis
+- 👥 **User Authentication** - Supabase Auth with GitHub/Google OAuth
+- 📊 **Smart Caching** - Parent/Child cell system for efficient data storage
+- 🏆 **Gamification** - Points, levels, leaderboard, and mission completion tracking
 
 ---
 
@@ -20,7 +22,12 @@ Interactive application for analyzing and combating urban heat islands with gami
 ### Prerequisites
 - **Python 3.11+** ([Download](https://www.python.org/downloads/))
 - **Node.js 18+** ([Download](https://nodejs.org/))
+- **Supabase Account** ([Sign up free](https://supabase.com))
 - **Mapbox Token** ([Get free token](https://account.mapbox.com/access-tokens/))
+- **AI Provider** (at least one):
+  - Google Vertex AI + Service Account JSON
+  - OpenAI API Key
+  - Google Gemini API Key
 
 ### Step 1: Install Dependencies
 
@@ -39,11 +46,27 @@ cd ..
 Create the file `backend/.env`:
 
 ```env
+# Mapbox (Required)
 MAP=pk.eyJ1IjoieW91ci10b2tlbiIsImEiOiJja...
+
+# Supabase (Required)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+
+# AWS (Required for Landsat data)
 AWS_REGION=us-west-2
+
+# AI Providers (at least one required)
+OPENAI_API_KEY=sk-...
+GOOGLE_GEMINI_API_KEY=...
+GOOGLE_CLOUD_PROJECT=your-project-id
+VERTEX_AI_CREDENTIALS=vertex-access.json
 ```
 
-**Important:** Replace the placeholder with your [Mapbox Token](https://account.mapbox.com/access-tokens/).
+**Important:** 
+- Get Mapbox Token from [here](https://account.mapbox.com/access-tokens/)
+- Create Supabase project and run `database/supabase_schema_mit_parent_child.sql`
+- At least one AI provider must be configured
 
 ### Step 3: Start Application
 
@@ -59,8 +82,9 @@ npm run dev
 ```
 
 ### Access:
-- 🌐 **Frontend:** http://localhost:8080
+- 🌐 **Frontend:** http://localhost:5173
 - 📡 **Backend API:** http://localhost:8000/docs
+- 🗄️ **Supabase Studio:** https://supabase.com/dashboard/project/your-project-id
 
 ---
 
@@ -143,26 +167,31 @@ services:
 
 ## 🛠️ Technology Stack
 
-### Frontend (Port 8080)
+### Frontend (Port 5173)
 | Technology | Purpose |
 |------------|---------|
 | React 18 + TypeScript | UI Framework |
-| Vite | Build Tool |
-| Mapbox GL | Interactive Maps |
-| Shadcn UI | UI Components |
+| Vite | Build Tool & Dev Server |
+| Mapbox GL JS | Interactive Maps |
+| Shadcn UI | UI Component Library |
+| Supabase JS | Authentication & Database |
 | React Router | Navigation |
-| TanStack Query | State Management |
+| Framer Motion | Animations |
+| Sonner | Toast Notifications |
 
 ### Backend (Port 8000)
 | Technology | Purpose |
 |------------|---------|
 | FastAPI | REST API Framework |
 | Python 3.11 | Programming Language |
-| Landsat 8/9 | Temperature Data (AWS) |
-| Sentinel-2 | NDVI/Vegetation Data |
-| Mapbox API | Satellite Images |
-| Google Vertex AI | AI Image Description (Gemini) |
-| Rasterio | Geospatial Data Processing |
+| Supabase | PostgreSQL Database & Auth |
+| Landsat 8/9 (AWS) | Surface Temperature Data |
+| Sentinel-2 (AWS) | NDVI/Vegetation Index |
+| Mapbox Static API | Satellite Images |
+| Google Vertex AI (Gemini) | AI Image Analysis |
+| OpenAI GPT-4 Vision | Alternative AI Provider |
+| Rasterio | Geospatial Processing |
+| STAC API | Satellite Data Discovery |
 
 ---
 
@@ -170,32 +199,63 @@ services:
 
 ```
 HeatQuest/
-├── src/                      # Frontend (React)
-│   ├── pages/               # Login, Map, Analyze, Profile, etc.
-│   ├── components/          # UI Components
-│   ├── contexts/            # GameContext (State)
-│   └── main.tsx            # Entry Point
+├── frontend/
+│   ├── src/
+│   │   ├── pages/               # Application Pages
+│   │   │   ├── Login.tsx        # Authentication
+│   │   │   ├── MapView.tsx      # Main Map + Missions
+│   │   │   ├── MissionDetail.tsx # Mission Details
+│   │   │   ├── Profile.tsx      # User Profile
+│   │   │   ├── Leaderboard.tsx  # Rankings
+│   │   │   └── Analyze.tsx      # Image Analysis
+│   │   ├── components/          # Reusable Components
+│   │   │   ├── MapboxMap.tsx    # Interactive Map
+│   │   │   ├── BottomNav.tsx    # Navigation Bar
+│   │   │   └── ui/              # Shadcn Components
+│   │   ├── contexts/            # React Contexts
+│   │   │   ├── AuthContext.tsx  # Supabase Auth
+│   │   │   └── GameContext.tsx  # Game State
+│   │   ├── hooks/               # Custom Hooks
+│   │   │   ├── useHeatmap.ts    # Heatmap Logic
+│   │   │   └── useMissions.ts   # Mission Management
+│   │   ├── services/            # API Services
+│   │   └── lib/                 # Utils & Config
+│   └── package.json
 │
-├── backend/                 # Backend (Python/FastAPI)
+├── backend/
 │   ├── app/
-│   │   ├── main.py         # FastAPI App
-│   │   ├── api/v1/         # API Endpoints
-│   │   │   ├── heatmap.py  # Temperature Analysis
-│   │   │   └── location_description.py  # AI Analysis
-│   │   ├── services/       # Business Logic
-│   │   │   ├── grid_service.py
-│   │   │   ├── landsat_service.py
-│   │   │   ├── sentinel_service.py
-│   │   │   └── location_description_service.py
-│   │   ├── models/         # Pydantic Models
-│   │   └── core/           # Config & Utils
-│   ├── cache/              # Temp Data
-│   ├── requirements.txt    # Python Dependencies
-│   └── .env               # Configuration (create yourself!)
+│   │   ├── main.py              # FastAPI Application
+│   │   ├── api/v1/              # API Endpoints
+│   │   │   ├── heatmap.py       # Heatmap + Auto-Analysis
+│   │   │   ├── missions.py      # Mission CRUD
+│   │   │   ├── location_description.py  # AI Analysis
+│   │   │   └── test.py          # Health Checks
+│   │   ├── services/            # Business Logic
+│   │   │   ├── grid_service.py              # Grid Calculations
+│   │   │   ├── landsat_service.py           # Temperature Data
+│   │   │   ├── sentinel_service.py          # NDVI Data
+│   │   │   ├── stac_service.py              # Satellite Search
+│   │   │   ├── parent_cell_service.py       # Cache System
+│   │   │   ├── location_description_service.py  # AI Analysis
+│   │   │   ├── mission_generation_service.py    # Auto-Missions
+│   │   │   └── visualization_service.py     # PNG Generation
+│   │   ├── models/              # Data Models
+│   │   │   ├── heatmap.py
+│   │   │   ├── mission.py
+│   │   │   └── location_description.py
+│   │   ├── core/                # Core Configuration
+│   │   │   ├── config.py        # Settings
+│   │   │   ├── supabase_client.py
+│   │   │   └── aws_client.py
+│   │   └── cache/               # Cached Satellite Images
+│   ├── requirements.txt
+│   ├── .env                     # Configuration
+│   └── vertex-access.json       # Google Cloud Credentials
 │
-├── package.json            # NPM Dependencies
-├── vite.config.ts         # Vite Configuration
-└── README.md              # This File
+├── database/
+│   └── supabase_schema_mit_parent_child.sql  # Database Schema
+│
+└── README.md
 ```
 
 ---
@@ -204,7 +264,7 @@ HeatQuest/
 
 Available after startup at: http://localhost:8000/docs
 
-### 1. Heatmap Analysis
+### 1. Heatmap Analysis (Smart Caching)
 ```
 GET /api/v1/grid-heat-score-radius
 ```
@@ -212,8 +272,15 @@ GET /api/v1/grid-heat-score-radius
 - `lat`, `lon` - GPS coordinates
 - `radius_m` - Search radius in meters (default: 500)
 - `cell_size_m` - Cell size (default: 30m)
+- `use_cache` - Use cached data (default: true)
+- `user_id` - Auto-generate missions for this user
 
-**Response:** JSON with temperature, NDVI and heat score per grid cell
+**Response:** JSON with temperature, NDVI, heat score per grid cell + auto-generated missions
+
+**Features:**
+- Parent/Child Cell caching system
+- Automatic AI analysis for hotspots
+- Mission generation for high heat score areas
 
 ### 2. AI Image Description
 ```
@@ -223,24 +290,37 @@ GET /api/v1/describe-location
 - `lat`, `lon` - GPS coordinates
 - `zoom` - Zoom level (1-20, default: 17)
 
-**Response:** AI-generated location description with satellite image
+**Response:** AI-generated description, main cause, suggested actions
+
+### 3. Mission Management
+```
+GET  /api/v1/missions?user_id={id}
+POST /api/v1/missions/complete
+```
+**Features:**
+- Automatic mission generation from hotspot analysis
+- Distance-based sorting
+- Status tracking (pending, active, completed)
 
 ---
 
 ## 🎮 Features
 
 ### For Users:
-- **Mission System:** Various heat exploration missions
-- **Collect Points:** For discovered heat islands
-- **Leaderboard:** Compare with other players
-- **Profile:** Personal statistics and achievements
+- **Auto-Generated Missions** - AI detects hotspots and creates missions automatically
+- **Interactive Map** - Real-time heatmap with mission markers
+- **Points & Levels** - Earn XP by completing missions
+- **Leaderboard** - Global rankings and competition
+- **Profile** - Personal statistics, completed missions, and progress
+- **Social Login** - GitHub/Google OAuth via Supabase
 
 ### Technical Features:
-- **Real-time Temperature Analysis** from Landsat satellite data
-- **NDVI Calculation** for vegetation detection
-- **Heat Score Algorithm:** `heat_score = temp - (0.3 × NDVI)`
-- **AI Image Analysis** with Google Gemini 2.0 Flash
-- **Caching System** for faster loading times
+- **Smart Caching System** - Parent/Child cells reduce API calls by 90%
+- **Real-time Satellite Data** - Landsat 8/9 for temperature, Sentinel-2 for NDVI
+- **Heat Score Algorithm:** `heat_score = temperature - (0.3 × NDVI) - 15`
+- **Multi-AI Provider Support** - Vertex AI, OpenAI, Google Gemini
+- **Automatic Mission Generation** - AI analyzes hotspots and creates actionable missions
+- **Database-backed** - Supabase PostgreSQL for users, missions, and analyses
 
 ---
 
