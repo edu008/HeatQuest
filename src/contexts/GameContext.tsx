@@ -1,7 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useMissions, Mission as MissionType } from "../hooks/useMissions";
 
-export type Mission = MissionType;
+export interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  lat: number;
+  lng: number;
+  heatRisk: number;
+  reasons: string[];
+  actions: string[];
+  completed: boolean;
+}
 
 export interface UserProfile {
   username: string;
@@ -92,15 +101,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [activeMission, setActiveMission] = useState<Mission | null>(null);
-  
-  // Verwende den useMissions Hook für echte Missionen vom Backend
-  const {
-    missions,
-    loading: missionsLoading,
-    loadMissions,
-    completeMission: completeMissionAPI,
-    addMission: addMissionLocal,
-  } = useMissions();
+  const [missions, setMissions] = useState<Mission[]>(dummyMissions);
+  const [missionsLoading, setMissionsLoading] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
@@ -134,13 +136,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addMission = (mission: Mission) => {
-    addMissionLocal(mission);
+    setMissions((prev) => [...prev, mission]);
+  };
+
+  const loadMissions = async () => {
+    return missions;
   };
 
   const completeMission = async (missionId: string) => {
-    const success = await completeMissionAPI(missionId);
+    setMissions((prev) =>
+      prev.map((m) => (m.id === missionId ? { ...m, completed: true } : m))
+    );
     
-    if (success && user) {
+    if (user) {
       const xpGain = 100;
       const newXp = user.xp + xpGain;
       const newLevel = Math.floor(newXp / 500) + 1;
@@ -152,7 +160,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     }
     
-    return success;
+    return true;
   };
 
   const updateMissionActions = (missionId: string, actions: string[]) => {
