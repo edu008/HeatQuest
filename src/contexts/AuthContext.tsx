@@ -50,22 +50,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (user) {
-            await ensureProfile(user.id, user.user_metadata)
-          }
-          return
+        console.warn('Profile load error:', error)
+        return
+      }
+      
+      if (!data) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await ensureProfile(user.id, user.user_metadata)
         }
-        throw error
+        return
       }
       
       setProfile(data)
     } catch (error) {
-      console.error('Failed to load profile:', error)
+      console.warn('Failed to load profile:', error)
     }
   }
 
@@ -75,7 +77,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (existingProfile) {
         setProfile(existingProfile)
@@ -100,13 +102,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           missions_completed: 0,
         })
         .select()
-        .single()
+        .maybeSingle()
 
-      if (error) throw error
+      if (error) {
+        console.warn('Profile creation failed:', error)
+        return
+      }
       
-      setProfile(newProfile)
+      if (newProfile) {
+        setProfile(newProfile)
+      }
     } catch (error) {
-      console.error('Failed to create profile:', error)
+      console.warn('Failed to create profile:', error)
     }
   }
 
