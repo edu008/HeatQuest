@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGame } from "@/contexts/GameContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
 import { Camera } from "lucide-react";
@@ -11,6 +12,7 @@ import MapboxMap from "@/components/MapboxMap";
 
 const MapView = () => {
   const { missions, setActiveMission, user } = useGame();
+  const { user: authUser, loading } = useAuth();
   const navigate = useNavigate();
   
   // Mapbox Token aus Environment Variable oder localStorage (Fallback)
@@ -24,11 +26,17 @@ const MapView = () => {
     window.location.reload(); // Reload um Token zu aktivieren
   };
 
+  // Warte bis Auth geladen ist, dann prüfe ob User eingeloggt ist
   useEffect(() => {
-    if (!user) {
+    console.log('🗺️ MapView - Auth status:', { loading, hasUser: !!authUser, email: authUser?.email })
+    
+    if (!loading && !authUser) {
+      console.log('❌ No user found, redirecting to login...')
       navigate("/");
+    } else if (!loading && authUser) {
+      console.log('✅ User authenticated, staying on map')
     }
-  }, [user, navigate]);
+  }, [authUser, loading, navigate]);
 
   const handleMissionClick = (mission: any) => {
     setActiveMission(mission);
@@ -49,7 +57,7 @@ const MapView = () => {
               HeatQuest
             </h1>
             <p className="text-sm text-muted-foreground">
-              Hallo, {user?.username}! 👋
+              {loading ? "Loading..." : `Hello, ${authUser?.user_metadata?.user_name || authUser?.email?.split('@')[0] || user?.username}! 👋`}
             </p>
           </div>
           <Button

@@ -47,40 +47,74 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Lade Profil aus Datenbank
   const loadProfile = async (userId: string) => {
     try {
+      console.log('📥 Loading profile for:', userId)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Profile load error:', error)
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details
+        })
+        
+        // Wenn Profil nicht existiert (PGRST116), versuche es zu erstellen
+        if (error.code === 'PGRST116') {
+          console.log('⚠️ Profile not found, will try to create...')
+          // Hole User Info von Auth
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            await ensureProfile(user.id, user.user_metadata)
+          }
+          return
+        }
+        
+        throw error
+      }
+      
+      console.log('✅ Profile loaded:', data)
       setProfile(data)
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error('❌ Error loading profile:', error)
+      toast.error('Failed to load profile. Please refresh the page.')
     }
   }
 
   // Erstelle Profil falls noch nicht vorhanden (für OAuth-Logins)
   const ensureProfile = async (userId: string, metadata?: any) => {
     try {
+      console.log('🔍 Checking if profile exists for:', userId)
+      console.log('📋 Metadata:', metadata)
+      
       // Prüfe ob Profil existiert
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
       if (existingProfile) {
+        console.log('✅ Profile exists:', existingProfile)
         setProfile(existingProfile)
         return
       }
+
+      console.log('⚠️ Profile does not exist, creating...')
+      console.log('Fetch error (expected if not exists):', fetchError)
 
       // Erstelle neues Profil
       const username = 
         metadata?.user_name || 
         metadata?.full_name || 
+        metadata?.name ||
         metadata?.email?.split('@')[0] || 
         `user_${userId.slice(0, 8)}`
+
+      console.log('📝 Creating profile with username:', username)
 
       const { data: newProfile, error } = await supabase
         .from('profiles')
@@ -95,41 +129,85 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error creating profile:', error)
+        throw error
+      }
+      
+      console.log('✅ Profile created:', newProfile)
       setProfile(newProfile)
-      toast.success(`Willkommen, ${username}! 🎉`)
+      toast.success(`Welcome, ${username}! 🎉`)
     } catch (error) {
-      console.error('Error ensuring profile:', error)
+      console.error('❌ Error ensuring profile:', error)
+      toast.error('Failed to create profile. Please try again.')
     }
   }
 
   // Initialisiere Auth State
   useEffect(() => {
+    console.log('🔄 AuthContext: Initializing...')
+    console.log('🔗 Current URL:', window.location.href)
+    
+    // Prüfe ob OAuth Redirect (URL enthält #access_token oder ?code=)
+    const isOAuthRedirect = window.location.hash.includes('access_token') || window.location.search.includes('code=')
+    
+    if (isOAuthRedirect) {
+      console.log('🔐 OAuth redirect detected! Processing...')
+    }
+    
     // Hole aktuelle Session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('📦 Initial session:', session ? 'Found' : 'None')
+      
+      if (session) {
+        console.log('📝 Session details:', {
+          user: session.user.email,
+          provider: session.user.app_metadata.provider,
+          expires: new Date(session.expires_at! * 1000).toLocaleString()
+        })
+      }
+      
       setSession(session)
       setUser(session?.user ?? null)
+      
       if (session?.user) {
-        loadProfile(session.user.id)
+        console.log('👤 User found:', session.user.email)
+        console.log('🔑 Provider:', session.user.app_metadata.provider)
+        
+        // Bei OAuth: Erstelle/Lade Profil
+        if (session.user.app_metadata.provider !== 'email') {
+          console.log('🔐 OAuth user detected, ensuring profile...')
+          await ensureProfile(session.user.id, session.user.user_metadata)
+        } else {
+          await loadProfile(session.user.id)
+        }
       }
       setLoading(false)
+      console.log('✅ AuthContext: Ready!')
     })
 
     // Höre auf Auth Changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔔 Auth event:', event, session ? 'Session exists' : 'No session')
+      
       setSession(session)
       setUser(session?.user ?? null)
       
       if (session?.user) {
+        console.log('👤 User in event:', session.user.email)
+        console.log('🔑 Provider:', session.user.app_metadata.provider)
+        
         // Bei OAuth-Login (SIGNED_IN) stelle sicher, dass Profil existiert
         if (event === 'SIGNED_IN' && session.user.app_metadata.provider !== 'email') {
+          console.log('🔐 OAuth SIGNED_IN, ensuring profile...')
           await ensureProfile(session.user.id, session.user.user_metadata)
         } else {
           await loadProfile(session.user.id)
         }
       } else {
+        console.log('❌ No user, clearing profile')
         setProfile(null)
       }
     })
@@ -191,19 +269,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // OAuth Login (GitHub, Google)
   const signInWithOAuth = async (provider: 'github' | 'google') => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log(`🔐 Starting OAuth with ${provider}...`)
+      console.log('Origin:', window.location.origin)
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/map`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ OAuth Error:', error)
+        toast.error(`OAuth Error: ${error.message}`)
+        throw error
+      }
       
+      console.log('✅ OAuth Response:', data)
+      console.log('🔗 Will redirect to:', data.url)
       // Note: User wird automatisch weitergeleitet, daher kein toast hier
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'OAuth Login fehlgeschlagen')
+      console.error('❌ Caught Error:', authError)
+      toast.error(authError.message || 'OAuth Login failed')
       throw error
     }
   }

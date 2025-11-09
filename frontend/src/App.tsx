@@ -10,6 +10,7 @@ import Analyze from "./pages/Analyze";
 import MissionDetail from "./pages/MissionDetail";
 import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/map" element={<MapView />} />
             <Route path="/analyze" element={<Analyze />} />
             <Route path="/mission/:id" element={<MissionDetail />} />
