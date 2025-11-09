@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,14 @@ const Login = () => {
   const [registerUsername, setRegisterUsername] = useState("");
   const [loading, setLoading] = useState(false);
   
-  const { signIn, signUp, signInWithOAuth } = useAuth();
+  const { signIn, signUp, signInWithOAuth, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate("/map", { replace: true });
+    }
+  }, [user, navigate]);
 
   // Login with Supabase
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,16 +50,11 @@ const Login = () => {
     }
   };
 
-  // OAuth Login (GitHub, Google)
   const handleOAuthLogin = async (provider: 'github' | 'google') => {
-    console.log(`👆 Button clicked: ${provider}`)
     setLoading(true);
     try {
       await signInWithOAuth(provider);
-      // Redirect happens automatically through Supabase
-      console.log('⏳ Waiting for redirect...')
     } catch (error) {
-      console.error(`❌ ${provider} login failed:`, error);
       setLoading(false);
     }
   };

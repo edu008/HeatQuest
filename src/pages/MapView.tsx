@@ -17,52 +17,29 @@ const MapView = () => {
   const navigate = useNavigate();
   const { scanCurrentLocation, loading: scanLoading, data: heatmapData } = useHeatmap();
   
-  // Mapbox Token aus Environment Variable oder localStorage (Fallback)
-  const envToken = import.meta.env.VITE_MAPBOX_TOKEN;
-  const [mapboxToken, setMapboxToken] = useState<string>(() => {
-    return envToken || localStorage.getItem("mapbox_public_token") || "";
-  });
-  
-  const handleSaveToken = () => {
-    localStorage.setItem("mapbox_public_token", mapboxToken);
-    window.location.reload(); // Reload um Token zu aktivieren
-  };
+  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
-  // Automatischer Scan beim Laden der Map
   useEffect(() => {
-    console.log('🗺️ MapView - Auth status:', { loading, hasUser: !!authUser, email: authUser?.email })
-    
-    if (!loading && !authUser) {
-      console.log('❌ No user found, redirecting to login...')
-      navigate("/");
-      return;
-    }
-    
     if (!loading && authUser && !heatmapData && !scanLoading) {
-      console.log('✅ User authenticated, auto-scanning current location...')
-      // Auto-scan nach kurzer Verzögerung
       const timer = setTimeout(async () => {
         try {
-          await scanCurrentLocation(500); // 500m radius
+          await scanCurrentLocation(500);
         } catch (error) {
-          console.error('Auto-scan failed:', error);
+          // Silent fail
         }
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [authUser, loading, navigate, heatmapData, scanLoading, scanCurrentLocation]);
+  }, [authUser, loading, heatmapData, scanLoading, scanCurrentLocation]);
 
-  // Lade Missionen automatisch nach einem erfolgreichen Scan
   useEffect(() => {
     if (!scanLoading && heatmapData && authUser && loadMissions) {
-      console.log('🎯 Scan completed, loading missions for user...');
       const timer = setTimeout(async () => {
         try {
-          const loadedMissions = await loadMissions();
-          console.log(`✅ ${loadedMissions.length} missions loaded!`);
+          await loadMissions();
         } catch (error) {
-          console.error('❌ Failed to load missions:', error);
+          // Silent fail
         }
       }, 500);
       
@@ -174,32 +151,9 @@ const MapView = () => {
       })()}
 
       {/* Map Area */}
-      {mapboxToken ? (
-        <div className="h-full w-full">
-          <MapboxMap token={mapboxToken} missions={missions} onMissionClick={handleMissionClick} />
-        </div>
-      ) : (
-        <div className="flex-1 h-full w-full flex items-center justify-center p-4">
-          <Card className="w-full max-w-md p-6 rounded-3xl space-y-4">
-            <h2 className="text-xl font-bold">Mapbox Token</h2>
-            <p className="text-sm text-muted-foreground">
-              Füge deinen Mapbox Public Token ein, um die Karte zu laden.
-            </p>
-            <Input
-              placeholder="pk.eyJ1Ijo..."
-              value={mapboxToken}
-              onChange={(e) => setMapboxToken(e.target.value)}
-              className="rounded-xl"
-            />
-            <Button onClick={handleSaveToken} disabled={!mapboxToken.trim()} className="w-full rounded-xl">
-              Karte anzeigen
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Du findest den Token unter mapbox.com → Tokens.
-            </p>
-          </Card>
-        </div>
-      )}
+      <div className="h-full w-full">
+        <MapboxMap token={mapboxToken} missions={missions} onMissionClick={handleMissionClick} />
+      </div>
 
       <BottomNav />
     </div>

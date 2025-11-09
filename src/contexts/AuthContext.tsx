@@ -45,10 +45,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
 
-  // Lade Profil aus Datenbank
   const loadProfile = async (userId: string) => {
     try {
-      console.log('📥 Loading profile for:', userId)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -56,66 +54,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .single()
 
       if (error) {
-        console.error('❌ Profile load error:', error)
-        console.error('Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details
-        })
-        
-        // Wenn Profil nicht existiert (PGRST116), versuche es zu erstellen
         if (error.code === 'PGRST116') {
-          console.log('⚠️ Profile not found, will try to create...')
-          // Hole User Info von Auth
           const { data: { user } } = await supabase.auth.getUser()
           if (user) {
             await ensureProfile(user.id, user.user_metadata)
           }
           return
         }
-        
         throw error
       }
       
-      console.log('✅ Profile loaded:', data)
       setProfile(data)
     } catch (error) {
-      console.error('❌ Error loading profile:', error)
-      toast.error('Failed to load profile. Please refresh the page.')
+      toast.error('Failed to load profile')
     }
   }
 
-  // Erstelle Profil falls noch nicht vorhanden (für OAuth-Logins)
   const ensureProfile = async (userId: string, metadata?: any) => {
     try {
-      console.log('🔍 Checking if profile exists for:', userId)
-      console.log('📋 Metadata:', metadata)
-      
-      // Prüfe ob Profil existiert
-      const { data: existingProfile, error: fetchError } = await supabase
+      const { data: existingProfile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
       if (existingProfile) {
-        console.log('✅ Profile exists:', existingProfile)
         setProfile(existingProfile)
         return
       }
 
-      console.log('⚠️ Profile does not exist, creating...')
-      console.log('Fetch error (expected if not exists):', fetchError)
-
-      // Erstelle neues Profil
       const username = 
         metadata?.user_name || 
         metadata?.full_name || 
         metadata?.name ||
         metadata?.email?.split('@')[0] || 
         `user_${userId.slice(0, 8)}`
-
-      console.log('📝 Creating profile with username:', username)
 
       const { data: newProfile, error } = await supabase
         .from('profiles')
@@ -130,39 +103,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .select()
         .single()
 
-      if (error) {
-        console.error('❌ Error creating profile:', error)
-        throw error
-      }
+      if (error) throw error
       
-      console.log('✅ Profile created:', newProfile)
       setProfile(newProfile)
-      toast.success(`Welcome, ${username}! 🎉`)
+      toast.success(`Welcome, ${username}!`)
     } catch (error) {
-      console.error('❌ Error ensuring profile:', error)
-      toast.error('Failed to create profile. Please try again.')
+      toast.error('Failed to create profile')
     }
   }
 
-  // Initialisiere Auth State
   useEffect(() => {
-    console.log('🔄 AuthContext: Initializing...')
-
-    // 1) Set up auth listener FIRST (sync only!)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔔 Auth event:', event, session ? 'Session exists' : 'No session')
-
-      // Only synchronous state updates here
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        // Defer any Supabase calls to avoid deadlocks
         setTimeout(() => {
           if (session.user.app_metadata.provider !== 'email') {
-            console.log('🔐 OAuth user detected (event), ensuring profile...')
             ensureProfile(session.user.id, session.user.user_metadata)
           } else {
             loadProfile(session.user.id)
@@ -173,23 +132,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     })
 
-    // 2) THEN get the existing session
     supabase.auth
       .getSession()
       .then(({ data: { session }, error: sessionError }) => {
         if (sessionError) {
-          console.error('❌ Session error:', sessionError)
           setInitError(sessionError.message)
         }
 
-        console.log('📦 Initial session:', session ? 'Found' : 'None')
         setSession(session)
         setUser(session?.user ?? null)
 
         if (session?.user) {
           setTimeout(() => {
             if (session.user.app_metadata.provider !== 'email') {
-              console.log('🔐 OAuth user detected (init), ensuring profile...')
               ensureProfile(session.user.id, session.user.user_metadata)
             } else {
               loadProfile(session.user.id)
@@ -198,12 +153,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       })
       .catch((err) => {
-        console.error('❌ Auth init error:', err)
         setInitError(err instanceof Error ? err.message : 'Unknown error')
       })
       .finally(() => {
         setLoading(false)
-        console.log('✅ AuthContext: Ready!')
       })
 
     return () => subscription.unsubscribe()
@@ -262,13 +215,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }
 
-  // OAuth Login (GitHub, Google)
   const signInWithOAuth = async (provider: 'github' | 'google') => {
     try {
-      console.log(`🔐 Starting OAuth with ${provider}...`)
-      console.log('Origin:', window.location.origin)
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -276,17 +225,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       })
 
       if (error) {
-        console.error('❌ OAuth Error:', error)
         toast.error(`OAuth Error: ${error.message}`)
         throw error
       }
-      
-      console.log('✅ OAuth Response:', data)
-      console.log('🔗 Will redirect to:', data.url)
-      // Note: User wird automatisch weitergeleitet, daher kein toast hier
     } catch (error) {
       const authError = error as AuthError
-      console.error('❌ Caught Error:', authError)
       toast.error(authError.message || 'OAuth Login failed')
       throw error
     }
