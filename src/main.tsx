@@ -1,26 +1,35 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { GameProvider, useGame } from "./contexts/GameContext";
 import "./index.css";
 
-console.log("[BOOT] main.tsx START");
+import Login from "./pages/Login";
+import MapView from "./pages/MapView";
+import Analyze from "./pages/Analyze";
+import MissionDetail from "./pages/MissionDetail";
+import Profile from "./pages/Profile";
+import Leaderboard from "./pages/Leaderboard";
 
-// Minimal test to see if React loads
-const TestApp = () => {
-  console.log("[BOOT] TestApp rendering");
-  return (
-    <div style={{ padding: "20px", background: "lightblue", minHeight: "100vh" }}>
-      <h1 style={{ color: "black" }}>🔥 React läuft!</h1>
-      <p style={{ color: "black" }}>Wenn du das siehst, funktioniert React.</p>
-    </div>
-  );
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useGame();
+  return user ? <>{children}</> : <Navigate to="/" replace />;
 };
 
-console.log("[BOOT] Creating root");
-const root = createRoot(document.getElementById("root")!);
-console.log("[BOOT] Rendering TestApp");
-root.render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <TestApp />
+    <GameProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/map" element={<ProtectedRoute><MapView /></ProtectedRoute>} />
+          <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
+          <Route path="/mission/:id" element={<ProtectedRoute><MissionDetail /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </GameProvider>
   </StrictMode>
 );
-console.log("[BOOT] Render complete");
