@@ -1,7 +1,8 @@
 """
-Heatmap-API-Endpunkte.
+Heatmap-API-Endpunkte mit Smart-Cache.
 Moderne REST-API für Temperatur-Heatmaps basierend auf GPS-Koordinaten.
 Nutzt Landsat-Temperaturdaten und Sentinel-2 NDVI mit optimiertem Batch-Processing.
+Integriert Parent/Child-Grid-System für Community-Cache.
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -10,9 +11,10 @@ from typing import Optional
 import logging
 import math
 
-from app.models.heatmap import GridHeatScoreResponse
+from app.models.heatmap import GridHeatScoreResponse, GridCellResponse
 from app.services.grid_service import grid_service
 from app.services.visualization_service import visualization_service
+from app.services.parent_cell_service import parent_cell_service
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,11 @@ async def get_grid_heat_score_radius(
         description="Batch-Processing nutzen",
         example=True
     ),
+    use_cache: Optional[bool] = Query(
+        True,
+        description="🚀 Smart-Cache nutzen (lädt aus DB wenn verfügbar)",
+        example=True
+    ),
     format: Optional[str] = Query(
         "json",
         description="Ausgabeformat: 'json' oder 'geojson'",
@@ -71,37 +78,45 @@ async def get_grid_heat_score_radius(
     )
 ):
     """
-    🎯 **EINFACHSTER ENDPOINT FÜR JSON-DATEN!**
+    🎯 **SMART HEATMAP mit Community-Cache!**
     
-    Gib nur Mittelpunkt + Radius an, bekomme JSON mit allen Heat Scores zurück!
+    Lädt Heatmap-Daten intelligent:
+    - ✅ **Nutzt existierende Scans** wenn verfügbar (⚡ 0.5s statt 30s!)
+    - ✅ **Scannt neu** wenn Bereich noch nicht erfasst
+    - ✅ **Community-Feature:** User profitieren voneinander
     
     **Beispiel-URL:**
     ```
     /api/v1/grid-heat-score-radius?lat=51.5323&lon=-0.0531&radius_m=500&cell_size_m=30
     ```
     
-    **Das wars!** Keine scene_id, keine Bounding Box - nur Koordinaten! 🚀
+    **Wie es funktioniert:**
+    
+    1. **User A (09:00)** scannt Bahnhofplatz → Neuer Scan, speichert Parent-Cell + Child-Cells
+    2. **User B (10:00)** scannt gleichen Bereich → Parent-Cell gefunden! Lädt aus DB (⚡ instant!)
+    3. **User C (11:00)** scannt 500m weiter → Neue Parent-Cell, neuer Scan
     
     **Response enthält:**
-    - Liste aller Grid-Zellen mit temp, ndvi, heat_score
-    - Total cells
-    - Bounds
-    - Scene ID (automatisch gefunden für London, Berlin, Paris, New York)
-    - NDVI source
-    
-    **Format-Optionen:**
-    - `json` (Standard): Strukturierte JSON-Response
-    - `geojson`: GeoJSON für GIS-Tools (QGIS, Leaflet, etc.)
+    - `grid_cells`: Heat Score Daten
+    - `from_cache`: TRUE wenn aus DB geladen
+    - `parent_cell_info`: Info über Parent-Cell (wer hat schon gescannt, etc.)
+    - `total_scans`: Wie oft wurde dieser Bereich schon gescannt
     
     **Parameter:**
     - **lat, lon**: Koordinaten (z.B. London: 51.5323, -0.0531)
     - **radius_m**: Radius in Metern (500m = 1km Durchmesser)
     - **cell_size_m**: Zellengröße (30m = maximale Auflösung)
+    - **use_cache**: TRUE = Smart-Cache nutzen (empfohlen!), FALSE = immer neu scannen
     - **scene_id**: Optional - wird automatisch gefunden
     """
     
     try:
-        logger.info(f"🎯 JSON Heat Score: Zentrum=({lat},{lon}), Radius={radius_m}m")
+        logger.info("=" * 70)
+        logger.info(f"🎯 SMART HEATMAP REQUEST")
+        logger.info(f"   Position: ({lat}, {lon})")
+        logger.info(f"   Radius: {radius_m}m, Cell Size: {cell_size_m}m")
+        logger.info(f"   Use Cache: {use_cache}")
+        logger.info("=" * 70)
         
         # Berechne Bounding Box aus Radius
         lat_offset = radius_m / 111000
@@ -112,32 +127,107 @@ async def get_grid_heat_score_radius(
         lon_min = lon - lon_offset
         lon_max = lon + lon_offset
         
-        # Generiere Grid
-        grid_cells = grid_service.generate_grid(
-            lat_min=lat_min,
-            lat_max=lat_max,
-            lon_min=lon_min,
-            lon_max=lon_max,
-            cell_size_m=cell_size_m
-        )
+        # Variablen initialisieren
+        from_cache = False
+        parent_cell = None
+        cell_results = []
+        landsat_scene_id = None
+        ndvi_source = None
         
-        logger.info(f"   Grid: {len(grid_cells)} Zellen ({cell_size_m}m × {cell_size_m}m)")
+        # ========================================
+        # SMART CACHE LOGIC
+        # ========================================
+        if use_cache:
+            # Schritt 1: Suche existierende Parent-Cell
+            parent_cell = await parent_cell_service.find_existing_parent_cell(lat, lon)
+            
+            if parent_cell:
+                # ✅ Parent-Cell gefunden! Lade aus DB
+                logger.info("🎉 Parent-Cell gefunden! Lade Child-Cells aus Cache...")
+                from_cache = True
+                
+                # Erhöhe Scan-Counter
+                await parent_cell_service.increment_scan_count(parent_cell['id'])
+                
+                # Lade Child-Cells
+                child_cells_data = await parent_cell_service.load_child_cells(parent_cell['id'])
+                
+                # Konvertiere zu GridCellResponse
+                cell_results = [
+                    GridCellResponse(
+                        cell_id=cell['cell_id'],
+                        lat_min=cell['lat_min'],
+                        lat_max=cell['lat_max'],
+                        lon_min=cell['lon_min'],
+                        lon_max=cell['lon_max'],
+                        temp=cell['temperature'],
+                        ndvi=cell['ndvi'],
+                        heat_score=cell['heat_score'],
+                        pixel_count=cell.get('pixel_count')
+                    )
+                    for cell in child_cells_data
+                ]
+                
+                landsat_scene_id = parent_cell.get('landsat_scene_id')
+                ndvi_source = parent_cell.get('ndvi_source')
+                
+                logger.info(f"✅ {len(cell_results)} Child-Cells aus Cache geladen!")
+                logger.info(f"⚡ Dieser Bereich wurde bereits {parent_cell['total_scans']}x gescannt")
         
-        # Berechne Heat Scores mit Batch-Processing
-        if use_batch:
-            cell_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores_batch(
-                grid_cells=grid_cells,
-                scene_id=scene_id,
-                max_cells=5000
+        # ========================================
+        # FALLBACK: Neuer Scan
+        # ========================================
+        if not cell_results:
+            logger.info("🔍 Kein Cache verfügbar → Starte neuen Scan...")
+            
+            # Generiere Grid
+            grid_cells = grid_service.generate_grid(
+                lat_min=lat_min,
+                lat_max=lat_max,
+                lon_min=lon_min,
+                lon_max=lon_max,
+                cell_size_m=cell_size_m
             )
-        else:
-            cell_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores(
-                grid_cells=grid_cells,
-                scene_id=scene_id,
-                max_cells=100
-            )
+            
+            logger.info(f"   Grid: {len(grid_cells)} Zellen ({cell_size_m}m × {cell_size_m}m)")
+            
+            # Berechne Heat Scores
+            if use_batch:
+                cell_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores_batch(
+                    grid_cells=grid_cells,
+                    scene_id=scene_id,
+                    max_cells=5000
+                )
+            else:
+                cell_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores(
+                    grid_cells=grid_cells,
+                    scene_id=scene_id,
+                    max_cells=100
+                )
+            
+            # Speichere in DB (nur wenn Cache aktiviert)
+            if use_cache:
+                logger.info("💾 Speichere Scan für zukünftige User...")
+                
+                # Erstelle Parent-Cell
+                parent_cell = await parent_cell_service.create_parent_cell(
+                    lat=lat,
+                    lon=lon,
+                    landsat_scene_id=landsat_scene_id,
+                    ndvi_source=ndvi_source
+                )
+                
+                # Speichere Child-Cells
+                await parent_cell_service.save_child_cells(
+                    parent_cell_id=parent_cell['id'],
+                    grid_cells=cell_results
+                )
+                
+                logger.info("✅ Scan gespeichert! Nächster User kann aus Cache laden.")
         
-        # Erstelle Response
+        # ========================================
+        # RESPONSE
+        # ========================================
         bounds = {
             "lat_min": lat_min,
             "lat_max": lat_max,
@@ -154,12 +244,31 @@ async def get_grid_heat_score_radius(
             ndvi_source=ndvi_source
         )
         
+        # Erweitere Response mit Cache-Info
+        response_dict = response.dict()
+        response_dict['from_cache'] = from_cache
+        response_dict['parent_cell_info'] = {
+            'id': parent_cell['id'],
+            'cell_key': parent_cell['cell_key'],
+            'total_scans': parent_cell['total_scans'],
+            'last_scanned_at': parent_cell['last_scanned_at'],
+            'child_cells_count': parent_cell['child_cells_count']
+        } if parent_cell else None
+        
+        logger.info("=" * 70)
+        logger.info(f"✅ Response bereit:")
+        logger.info(f"   From Cache: {from_cache}")
+        logger.info(f"   Total Cells: {len(cell_results)}")
+        if parent_cell:
+            logger.info(f"   Total Scans (dieser Bereich): {parent_cell['total_scans']}")
+        logger.info("=" * 70)
+        
         # Format-Ausgabe
         if format.lower() == "geojson":
             geojson = grid_service.export_to_geojson(cell_results, bounds)
             return JSONResponse(content=geojson)
         else:
-            return response
+            return JSONResponse(content=response_dict)
     
     except HTTPException:
         raise

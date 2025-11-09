@@ -10,6 +10,7 @@ import logging
 from app.core.config import settings
 from app.api.v1.heatmap import router as heatmap_router
 from app.api.v1.location_description import router as location_description_router
+from app.api.v1.test_supabase import router as test_router
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -40,6 +41,7 @@ app.add_middleware(
 # Router einbinden
 app.include_router(heatmap_router)
 app.include_router(location_description_router)
+app.include_router(test_router)
 
 
 @app.get("/", tags=["root"])
@@ -54,7 +56,7 @@ async def root():
         "redoc": "/redoc",
         "services": {
             "heatmap": {
-                "description": "Temperatur-Analyse und Heat Scores",
+                "description": "🚀 Smart Temperatur-Analyse mit Community-Cache",
                 "endpoints": [
                     "/api/v1/grid-heat-score-radius",
                     "/api/v1/grid-heat-score-map-radius"

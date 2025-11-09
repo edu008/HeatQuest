@@ -3,7 +3,7 @@ Konfigurationsmodul für das HeatQuest Backend.
 Verwaltet AWS-Credentials und Landsat-Bucket-Einstellungen.
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -25,9 +25,16 @@ class Settings(BaseSettings):
     # Mapbox API Token für Visualisierung und Satellitenbilder
     map: Optional[str] = None
     
+    # Supabase Configuration
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None
+    
     # Vertex AI Configuration
     vertex_service_account_path: str = "vertex-access.json"
     vertex_location: str = "us-east4"  # Gemini-Modelle verfügbar (früher: us-central1)
+    vertex_project_id: Optional[str] = None  # Vertex AI Project ID
+    google_application_credentials: Optional[str] = None  # Path to service account JSON
+    vertex: Optional[str] = None  # Vertex AI API Key (falls verwendet)
     
     # Optional: Weitere Anbieter
     google_maps_api_key: Optional[str] = None
@@ -39,9 +46,12 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     api_description: str = "Backend für Oberflächentemperatur-Analyse aus Landsat-Daten"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Pydantic v2 Config
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"  # Ignoriere unbekannte Felder aus .env
+    )
 
 
 # Singleton-Instanz
