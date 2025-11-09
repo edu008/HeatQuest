@@ -144,24 +144,11 @@ class HeatmapService {
     parentCellId?: string;
     lastScanned?: string;
   }> {
-    // Diese Info kommt aus der Heatmap Response
-    // Wenn use_cache=true und cached=true, existiert Parent Cell
-    try {
-      const result = await this.getHeatmapForLocation({
-        latitude,
-        longitude,
-        radius_m: 100, // Kleiner Radius für schnellen Check
-        use_cache: true,
-      });
-
-      return {
-        exists: result.from_cache === true,
-        parentCellId: result.parent_cell_info?.id,
-      };
-    } catch (error) {
-      console.error('Check parent cell failed:', error);
-      return { exists: false };
-    }
+    // Mock implementation
+    return {
+      exists: true,
+      parentCellId: 'mock-parent',
+    };
   }
 
   /**
@@ -172,14 +159,13 @@ class HeatmapService {
     longitude: number,
     radius_m: number = 500
   ): Promise<HeatmapResponse> {
-    console.log('🚀 Starting new heatmap scan...');
-
+    console.log('🚀 Mock: Starting new heatmap scan...');
     return this.getHeatmapForLocation({
       latitude,
       longitude,
       radius_m,
       cell_size_m: 30,
-      use_cache: false, // Force neuer Scan
+      use_cache: false,
     });
   }
 
@@ -191,23 +177,12 @@ class HeatmapService {
     longitude: number,
     radius_m: number = 500
   ): Promise<HeatmapResponse | null> {
-    try {
-      const result = await this.getHeatmapForLocation({
-        latitude,
-        longitude,
-        radius_m,
-        use_cache: true,
-      });
-
-      // Wenn nicht aus Cache, return null
-      if (!result.from_cache) {
-        return null;
-      }
-
-      return result;
-    } catch {
-      return null;
-    }
+    return this.getHeatmapForLocation({
+      latitude,
+      longitude,
+      radius_m,
+      use_cache: true,
+    });
   }
 }
 

@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContextMock';
 
 export interface Mission {
   id: string;
@@ -32,113 +32,31 @@ export const useMissions = () => {
    * Lädt Missionen für den aktuellen User
    */
   const loadMissions = useCallback(async () => {
-    if (!user?.id) {
-      console.log('❌ No user ID available for loading missions');
-      return [];
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const url = `${apiUrl}/api/v1/missions?user_id=${user.id}&include_completed=true`;
-      
-      console.log('🔍 Loading missions from:', url);
-      console.log('📝 User ID:', user.id);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', response.headers.get('content-type'));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Response error:', errorText);
-        throw new Error(`Failed to load missions: ${response.status} - ${errorText.substring(0, 100)}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text.substring(0, 200));
-        throw new Error('API returned non-JSON response. Is the backend running?');
-      }
-
-      const data = await response.json();
-      console.log('✅ Missionen geladen:', data);
-
-      // Extrahiere Missionen aus Response
-      const loadedMissions: Mission[] = data.missions || [];
-      
-      // Sortiere nach Entfernung (nächste zuerst)
-      loadedMissions.sort((a, b) => {
-        const distA = a.distance_to_user || Infinity;
-        const distB = b.distance_to_user || Infinity;
-        return distA - distB;
-      });
-
-      setMissions(loadedMissions);
-      return loadedMissions;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('❌ Fehler beim Laden der Missionen:', errorMessage);
-      setError(errorMessage);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+    console.log('🔍 Mock: Loading missions...');
+    
+    // Return empty array for now (missions come from GameContext dummy data)
+    setLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    setLoading(false);
+    
+    return [];
+  }, []);
 
   /**
    * Markiert eine Mission als abgeschlossen
    */
   const completeMission = useCallback(async (missionId: string) => {
-    if (!user?.id) {
-      console.log('❌ No user ID available for completing mission');
-      return false;
-    }
+    console.log('✅ Mock: Completing mission', missionId);
+    
+    // Update local state
+    setMissions((prev) =>
+      prev.map((m) =>
+        m.id === missionId ? { ...m, completed: true, status: 'completed' } : m
+      )
+    );
 
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/v1/missions/${missionId}/complete`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to complete mission: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Mission abgeschlossen:', data);
-
-      // Update local state
-      setMissions((prev) =>
-        prev.map((m) =>
-          m.id === missionId ? { ...m, completed: true, status: 'completed' } : m
-        )
-      );
-
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('❌ Fehler beim Abschließen der Mission:', errorMessage);
-      return false;
-    }
-  }, [user?.id]);
+    return true;
+  }, []);
 
   /**
    * Fügt eine neue Mission hinzu (lokal)
