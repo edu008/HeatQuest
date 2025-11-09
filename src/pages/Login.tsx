@@ -8,7 +8,6 @@ import { Flame, Mail, Lock, User, Github } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Login = () => {
-  console.log('[Boot] Login render');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [registerUsername, setRegisterUsername] = useState("");

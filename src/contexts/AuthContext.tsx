@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initError, setInitError] = useState<string | null>(null)
 
   // Lade Profil aus Datenbank
   const loadProfile = async (userId: string) => {
@@ -148,43 +149,58 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     console.log('🔄 AuthContext: Initializing...')
     console.log('🔗 Current URL:', window.location.href)
     
-    // Prüfe ob OAuth Redirect (URL enthält #access_token oder ?code=)
-    const isOAuthRedirect = window.location.hash.includes('access_token') || window.location.search.includes('code=')
-    
-    if (isOAuthRedirect) {
-      console.log('🔐 OAuth redirect detected! Processing...')
+    const initAuth = async () => {
+      try {
+        // Prüfe ob OAuth Redirect (URL enthält #access_token oder ?code=)
+        const isOAuthRedirect = window.location.hash.includes('access_token') || window.location.search.includes('code=')
+        
+        if (isOAuthRedirect) {
+          console.log('🔐 OAuth redirect detected! Processing...')
+        }
+        
+        // Hole aktuelle Session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError)
+          setInitError(sessionError.message)
+        }
+        
+        console.log('📦 Initial session:', session ? 'Found' : 'None')
+        
+        if (session) {
+          console.log('📝 Session details:', {
+            user: session.user.email,
+            provider: session.user.app_metadata.provider,
+            expires: new Date(session.expires_at! * 1000).toLocaleString()
+          })
+        }
+        
+        setSession(session)
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          console.log('👤 User found:', session.user.email)
+          console.log('🔑 Provider:', session.user.app_metadata.provider)
+          
+          // Bei OAuth: Erstelle/Lade Profil
+          if (session.user.app_metadata.provider !== 'email') {
+            console.log('🔐 OAuth user detected, ensuring profile...')
+            await ensureProfile(session.user.id, session.user.user_metadata)
+          } else {
+            await loadProfile(session.user.id)
+          }
+        }
+      } catch (err) {
+        console.error('❌ Auth init error:', err)
+        setInitError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+        console.log('✅ AuthContext: Ready!')
+      }
     }
     
-    // Hole aktuelle Session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('📦 Initial session:', session ? 'Found' : 'None')
-      
-      if (session) {
-        console.log('📝 Session details:', {
-          user: session.user.email,
-          provider: session.user.app_metadata.provider,
-          expires: new Date(session.expires_at! * 1000).toLocaleString()
-        })
-      }
-      
-      setSession(session)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        console.log('👤 User found:', session.user.email)
-        console.log('🔑 Provider:', session.user.app_metadata.provider)
-        
-        // Bei OAuth: Erstelle/Lade Profil
-        if (session.user.app_metadata.provider !== 'email') {
-          console.log('🔐 OAuth user detected, ensuring profile...')
-          await ensureProfile(session.user.id, session.user.user_metadata)
-        } else {
-          await loadProfile(session.user.id)
-        }
-      }
-      setLoading(false)
-      console.log('✅ AuthContext: Ready!')
-    })
+    initAuth()
 
     // Höre auf Auth Changes
     const {
