@@ -12,44 +12,60 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary via-primary/80 to-secondary flex items-center justify-center p-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        background: 'linear-gradient(135deg, #FF6D42 0%, #FF8A5C 50%, #0DA5DD 100%)'
+      }}
+    >
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-3xl shadow-2xl p-8">
+        <div 
+          className="rounded-3xl p-8 shadow-2xl"
+          style={{ backgroundColor: 'white' }}
+        >
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <div className="w-24 h-24 bg-primary rounded-full flex items-center justify-center shadow-lg">
+            <div 
+              className="w-24 h-24 rounded-full flex items-center justify-center shadow-lg"
+              style={{ backgroundColor: '#FF6D42' }}
+            >
               <Flame className="w-12 h-12 text-white" />
             </div>
           </div>
 
           {/* Title */}
           <h1 className="text-4xl font-bold text-center mb-2">
-            <span className="text-primary">Heat</span>
-            <span className="text-muted-foreground">Quest</span>
+            <span style={{ color: '#FF6D42' }}>Heat</span>
+            <span style={{ color: '#718096' }}>Quest</span>
           </h1>
-          <p className="text-center text-muted-foreground mb-8">
+          <p className="text-center mb-8" style={{ color: '#718096' }}>
             Turning Hot Spots into Cool Spots 🌍
           </p>
 
           {/* Login/Signup Tabs */}
-          <div className="flex mb-6 bg-muted rounded-xl p-1">
+          <div 
+            className="flex mb-6 rounded-xl p-1"
+            style={{ backgroundColor: '#F7FAFC' }}
+          >
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-                isLogin
-                  ? 'bg-white shadow-sm text-foreground'
-                  : 'text-muted-foreground'
-              }`}
+              className="flex-1 py-2 rounded-lg font-medium transition-all"
+              style={{
+                backgroundColor: isLogin ? 'white' : 'transparent',
+                color: isLogin ? '#1A202C' : '#718096',
+                boxShadow: isLogin ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              }}
             >
               Login
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-                !isLogin
-                  ? 'bg-white shadow-sm text-foreground'
-                  : 'text-muted-foreground'
-              }`}
+              className="flex-1 py-2 rounded-lg font-medium transition-all"
+              style={{
+                backgroundColor: !isLogin ? 'white' : 'transparent',
+                color: !isLogin ? '#1A202C' : '#718096',
+                boxShadow: !isLogin ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              }}
             >
               Sign Up
             </button>
@@ -58,24 +74,51 @@ const Index = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4 mb-6">
             <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Mail 
+                className="absolute left-4 top-1/2 w-5 h-5" 
+                style={{ 
+                  transform: 'translateY(-50%)',
+                  color: '#718096'
+                }} 
+              />
               <input
                 type="email"
                 placeholder="Email"
-                className="w-full pl-12 pr-4 py-3 bg-muted border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border-none rounded-xl focus:outline-none"
+                style={{ 
+                  backgroundColor: '#F7FAFC',
+                  boxShadow: 'inset 0 0 0 1px transparent',
+                  transition: 'box-shadow 0.2s'
+                }}
+                onFocus={(e) => e.target.style.boxShadow = 'inset 0 0 0 2px #FF6D42'}
+                onBlur={(e) => e.target.style.boxShadow = 'inset 0 0 0 1px transparent'}
               />
             </div>
             <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Lock 
+                className="absolute left-4 top-1/2 w-5 h-5" 
+                style={{ 
+                  transform: 'translateY(-50%)',
+                  color: '#718096'
+                }} 
+              />
               <input
                 type="password"
                 placeholder="Password"
-                className="w-full pl-12 pr-4 py-3 bg-muted border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border-none rounded-xl focus:outline-none"
+                style={{ 
+                  backgroundColor: '#F7FAFC',
+                  boxShadow: 'inset 0 0 0 1px transparent',
+                  transition: 'box-shadow 0.2s'
+                }}
+                onFocus={(e) => e.target.style.boxShadow = 'inset 0 0 0 2px #FF6D42'}
+                onBlur={(e) => e.target.style.boxShadow = 'inset 0 0 0 1px transparent'}
               />
             </div>
             <button
               type="submit"
-              className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-medium transition-colors shadow-lg"
+              className="w-full py-3 text-white rounded-xl font-medium transition-all shadow-lg hover:opacity-90"
+              style={{ backgroundColor: '#FF6D42' }}
             >
               Sign In 🔥
             </button>
@@ -84,10 +127,10 @@ const Index = () => {
           {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border"></div>
+              <div className="w-full" style={{ borderTop: '1px solid #E2E8F0' }}></div>
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-white text-muted-foreground">
+              <span className="px-2 bg-white" style={{ color: '#718096' }}>
                 OR CONTINUE WITH
               </span>
             </div>
@@ -95,11 +138,17 @@ const Index = () => {
 
           {/* Social Login */}
           <div className="space-y-3 mb-8">
-            <button className="w-full py-3 bg-muted hover:bg-muted/80 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
+            <button 
+              className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 hover:opacity-80"
+              style={{ backgroundColor: '#F7FAFC' }}
+            >
               <Github className="w-5 h-5" />
               Sign in with GitHub
             </button>
-            <button className="w-full py-3 bg-muted hover:bg-muted/80 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
+            <button 
+              className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 hover:opacity-80"
+              style={{ backgroundColor: '#F7FAFC' }}
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -123,7 +172,7 @@ const Index = () => {
           </div>
 
           {/* Features */}
-          <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="space-y-2 text-sm" style={{ color: '#718096' }}>
             <div className="flex items-center gap-2">
               <span>🗺️</span>
               <span>Discover Heat Hotspots</span>
