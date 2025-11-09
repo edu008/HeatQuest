@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Home, Layers } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Camera, Loader2 } from 'lucide-react';
+import BottomNav from '../components/BottomNav';
 
 // Mock heatmap data points (Temperatur-Hotspots)
 const heatmapData = [
@@ -16,7 +16,8 @@ const heatmapData = [
 const Map = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [userName] = useState('edu008');
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -73,52 +74,56 @@ const Map = () => {
     };
   }, []);
 
+  const handleAnalyze = () => {
+    setIsAnalyzing(true);
+    setTimeout(() => {
+      setIsAnalyzing(false);
+    }, 3000);
+  };
+
   return (
-    <div className="relative w-full h-screen">
+    <div className="relative w-full h-screen pb-16">
       <div ref={mapContainer} className="absolute inset-0" />
       
       {/* Header */}
-      <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-        <Link
-          to="/"
-          className="bg-white rounded-lg p-3 shadow-lg hover:bg-gray-100 transition-colors"
-        >
-          <Home className="w-6 h-6" />
-        </Link>
-        
-        <div className="bg-white rounded-lg px-4 py-2 shadow-lg">
-          <h2 className="text-lg font-bold">🔥 HeatQuest Map</h2>
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-white to-transparent p-4 z-10">
+        <div className="flex justify-between items-center max-w-lg mx-auto">
+          <div>
+            <h1 className="text-2xl font-bold">
+              <span className="text-primary">Heat</span>
+              <span className="text-muted-foreground">Quest</span>
+            </h1>
+            <p className="text-sm text-muted-foreground">Hello, {userName}! 👋</p>
+          </div>
+          <button
+            onClick={handleAnalyze}
+            disabled={isAnalyzing}
+            className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-full font-medium shadow-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            <Camera className="w-5 h-5" />
+            Analyze
+          </button>
         </div>
-
-        <button
-          onClick={() => setShowHeatmap(!showHeatmap)}
-          className="bg-white rounded-lg p-3 shadow-lg hover:bg-gray-100 transition-colors"
-        >
-          <Layers className="w-6 h-6" />
-        </button>
       </div>
 
-      {/* Info Card */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg p-4 shadow-lg max-w-sm">
-        <h3 className="font-bold text-lg mb-2">Legende</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-red-500"></div>
-            <span>Hohe Temperatur (35°C+)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-            <span>Mittlere Temperatur (30-35°C)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-            <span>Niedrige Temperatur (25-30°C)</span>
+      {/* Analysis Modal */}
+      {isAnalyzing && (
+        <div className="absolute top-20 left-4 right-4 max-w-lg mx-auto z-20">
+          <div className="bg-white rounded-2xl shadow-2xl p-6">
+            <div className="flex items-start gap-4">
+              <Loader2 className="w-8 h-8 text-primary animate-spin flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h3 className="font-bold text-lg mb-2">Analyzing Area...</h3>
+                <p className="text-muted-foreground text-sm">
+                  Checking if this area was already scanned
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-        <p className="text-xs text-gray-600 mt-3">
-          Klicke auf einen Marker für Details
-        </p>
-      </div>
+      )}
+
+      <BottomNav />
     </div>
   );
 };
