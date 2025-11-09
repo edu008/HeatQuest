@@ -21,7 +21,6 @@ ENV/
 
 # Environment Variables (WICHTIG - enthält API-Keys!)
 .env
-.env.local
 .env.*.local
 
 # Cache und Temporäre Dateien
