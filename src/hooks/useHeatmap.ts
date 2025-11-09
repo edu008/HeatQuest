@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { locationService, UserLocation } from '@/services/locationService';
 import { heatmapService, HeatmapResponse } from '@/services/heatmapService';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContextMock';
 
 export interface HeatmapState {
   loading: boolean;

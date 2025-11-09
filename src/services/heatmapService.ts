@@ -53,62 +53,87 @@ class HeatmapService {
    * Hole Heatmap-Daten für Position
    */
   async getHeatmapForLocation(request: HeatmapRequest): Promise<HeatmapResponse> {
-    console.log('🌡️ Requesting heatmap for:', request);
+    console.log('🌡️ Mock heatmap for:', request);
 
-    const params = new URLSearchParams({
-      lat: request.latitude.toString(),
-      lon: request.longitude.toString(),
-      radius_m: (request.radius_m || 500).toString(),
-      cell_size_m: (request.cell_size_m || 30).toString(),
-      use_cache: (request.use_cache !== false).toString(),
-      use_batch: 'true',
-      format: 'json',
-    });
+    const lat = request.latitude;
+    const lon = request.longitude;
+    const radius = request.radius_m ?? 500;
+    const cellSize = request.cell_size_m ?? 30;
 
-    // Add user_id if provided (for automatic mission generation)
-    if (request.user_id) {
-      params.append('user_id', request.user_id);
-      console.log('🎯 Including user_id for mission generation:', request.user_id);
+    const metersToDegLat = (m: number) => m / 111_320;
+    const metersToDegLon = (m: number, latitude: number) => m / (111_320 * Math.cos((latitude * Math.PI) / 180) + 1e-6);
+
+    const latDelta = metersToDegLat(radius);
+    const lonDelta = metersToDegLon(radius, lat);
+
+    // Grid size roughly proportional to radius/cellSize
+    const cellsPerAxis = Math.max(6, Math.min(20, Math.round((radius / cellSize))));
+    const stepLat = (latDelta * 2) / cellsPerAxis;
+    const stepLon = (lonDelta * 2) / cellsPerAxis;
+
+    const grid: GridCell[] = [];
+
+    for (let i = 0; i < cellsPerAxis; i++) {
+      for (let j = 0; j < cellsPerAxis; j++) {
+        const center_lat = (lat - latDelta) + stepLat * (i + 0.5);
+        const center_lon = (lon - lonDelta) + stepLon * (j + 0.5);
+
+        const lat_min = center_lat - stepLat / 2;
+        const lat_max = center_lat + stepLat / 2;
+        const lon_min = center_lon - stepLon / 2;
+        const lon_max = center_lon + stepLon / 2;
+
+        // Simple synthetic metrics
+        const dx = (i - cellsPerAxis / 2) / (cellsPerAxis / 2);
+        const dy = (j - cellsPerAxis / 2) / (cellsPerAxis / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        const baseTemp = 26 + 6 * Math.max(0, 1 - dist) + (Math.sin(i * 0.7) + Math.cos(j * 0.5)) * 0.8;
+        const ndvi = Math.max(0, Math.min(1, 0.6 - 0.4 * Math.max(0, 1 - dist) + (Math.sin((i + j) * 0.3) * 0.1)));
+        const heat_score = Math.max(0, Math.min(1, (baseTemp - 24) / 10 * (1 - ndvi * 0.7)));
+        const is_hotspot = heat_score > 0.7;
+
+        grid.push({
+          cell_id: `cell_${i}_${j}`,
+          lat_min,
+          lat_max,
+          lon_min,
+          lon_max,
+          center_lat,
+          center_lon,
+          temperature: Number(baseTemp.toFixed(1)),
+          temp: Number(baseTemp.toFixed(1)),
+          ndvi: Number(ndvi.toFixed(2)),
+          heat_score: Number(heat_score.toFixed(2)),
+          is_hotspot,
+        });
+      }
     }
 
-    try {
-      const response = await fetch(
-        `${BACKEND_URL}/api/v1/grid-heat-score-radius?${params}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    const response: HeatmapResponse = {
+      grid_cells: grid,
+      total_cells: grid.length,
+      cell_size_m: cellSize,
+      bounds: {
+        lat_min: lat - latDelta,
+        lat_max: lat + latDelta,
+        lon_min: lon - lonDelta,
+        lon_max: lon + lonDelta,
+      },
+      scene_id: 'mock_scene',
+      ndvi_source: 'mock',
+      from_cache: true,
+      parent_cell_info: {
+        id: 'mock-parent',
+        cell_key: `${lat.toFixed(2)}_${lon.toFixed(2)}`,
+        total_scans: 3,
+        last_scanned_at: new Date().toISOString(),
+        child_cells_count: grid.length,
+      },
+    };
 
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('❌ Backend error:', error);
-        throw new Error(error.detail || 'Failed to fetch heatmap');
-      }
-
-      const data: HeatmapResponse = await response.json();
-      
-      // Map temperature to temp for compatibility
-      if (data.grid_cells) {
-        data.grid_cells = data.grid_cells.map(cell => ({
-          ...cell,
-          temp: cell.temperature,
-        }));
-      }
-      
-      console.log('✅ Heatmap received:', {
-        cells: data.grid_cells?.length,
-        cached: data.from_cache,
-        parent_cell: data.parent_cell_info?.cell_key,
-      });
-
-      return data;
-    } catch (error) {
-      console.error('❌ Heatmap request failed:', error);
-      throw error;
-    }
+    console.log('✅ Mock heatmap generated:', { cells: response.total_cells });
+    return Promise.resolve(response);
   }
 
   /**
