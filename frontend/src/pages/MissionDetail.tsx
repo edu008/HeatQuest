@@ -84,16 +84,30 @@ const MissionDetail = () => {
 
   const handleComplete = () => {
     if (checkedActions.size === 0) {
+<<<<<<< Updated upstream
       toast({ title: "Select at least one action", variant: "destructive" });
       return;
     }
     const missingProof = Array.from(checkedActions).some((i) => !actionProofs[i]);
     if (missingProof) {
       toast({ title: "Please add photos for checked actions", variant: "destructive" });
+=======
+      toast({
+        title: "Please select at least one action!",
+        variant: "destructive",
+      });
+>>>>>>> Stashed changes
       return;
     }
     completeMission(mission.id);
+<<<<<<< Updated upstream
     toast({ title: "Mission completed! 🎉", description: "+100 XP" });
+=======
+    toast({
+      title: "Mission completed! 🎉",
+      description: "+100 XP",
+    });
+>>>>>>> Stashed changes
     navigate("/profile");
   };
 
@@ -156,11 +170,56 @@ const MissionDetail = () => {
               <span>{mission.heatRisk}%</span>
             </div>
           </div>
+<<<<<<< Updated upstream
           <div className="w-full h-2 rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary via-heat to-cool-intense"
               style={{ width: `${Math.min(100, Math.round(completionPercentage))}%` }}
             />
+=======
+        </Card>
+
+        {/* Reasons */}
+        <Card className="p-6 rounded-3xl">
+          <h2 className="font-semibold mb-3">Why is it hot here? 🔥</h2>
+          <ul className="space-y-3">
+            {mission.reasons.map((reason, i) => (
+              <motion.li
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl"
+              >
+                <span className="text-heat text-xl">🔥</span>
+                <span className="flex-1 text-sm">{reason}</span>
+              </motion.li>
+            ))}
+          </ul>
+        </Card>
+
+        {/* Actions Checklist */}
+        <Card className="p-6 rounded-3xl">
+          <h2 className="font-semibold mb-3">Your Actions ✅</h2>
+          <div className="space-y-3">
+            {mission.actions.map((action, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl hover:bg-muted transition-colors cursor-pointer"
+                onClick={() => toggleAction(i)}
+              >
+                <Checkbox
+                  checked={checkedActions.has(i)}
+                  onCheckedChange={() => toggleAction(i)}
+                  className="mt-1"
+                />
+                <span className="flex-1 text-sm">{action}</span>
+              </motion.div>
+            ))}
+>>>>>>> Stashed changes
           </div>
           {/* Compact stats row */}
           <div className="grid grid-cols-3 gap-2">
@@ -179,6 +238,7 @@ const MissionDetail = () => {
           </div>
         </div>
 
+<<<<<<< Updated upstream
         {/* Main content compact grid */}
         <div className="grid grid-rows-2 gap-3">
           {/* Description card */}
@@ -281,6 +341,23 @@ const MissionDetail = () => {
           </AlertDialogContent>
         </AlertDialog>
       </motion.div>
+=======
+        {/* Complete Button */}
+        <Button
+          onClick={handleComplete}
+          disabled={mission.completed || checkedActions.size === 0}
+          className="w-full h-14 text-lg rounded-2xl bg-gradient-to-r from-heat via-primary to-cool-intense hover:shadow-xl transition-all"
+        >
+          {mission.completed ? (
+            "✅ Mission completed"
+          ) : allActionsChecked ? (
+            "🎉 Complete mission (+100 XP)"
+          ) : (
+            `Complete mission (${checkedActions.size}/${mission.actions.length})`
+          )}
+        </Button>
+      </div>
+>>>>>>> Stashed changes
     </div>
   );
 };
