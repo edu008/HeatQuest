@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useGame } from "@/contexts/GameContext";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, Flame } from "lucide-react";
 
 const MissionDetail = () => {
   const { id } = useParams();
@@ -15,15 +15,15 @@ const MissionDetail = () => {
 
   const mission = missions.find((m) => m.id === id);
 
-  useEffect(() => {
-    if (!mission) {
-      navigate("/map");
-    }
-  }, [mission, navigate]);
+  if (!mission) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Mission nicht gefunden</p>
+      </div>
+    );
+  }
 
-  if (!mission) return null;
-
-  const toggleAction = (index: number) => {
+  const handleActionToggle = (index: number) => {
     const newChecked = new Set(checkedActions);
     if (newChecked.has(index)) {
       newChecked.delete(index);
@@ -34,117 +34,131 @@ const MissionDetail = () => {
   };
 
   const handleComplete = () => {
-    if (checkedActions.size === 0) {
-      return;
-    }
-
     completeMission(mission.id);
-    navigate("/profile");
+    navigate("/map");
   };
 
-  const allActionsChecked = checkedActions.size === mission.actions.length;
+  const allActionsChecked =
+    checkedActions.size === mission.actions.length && mission.actions.length > 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <motion.div
         initial={{ y: -50 }}
         animate={{ y: 0 }}
-        className="sticky top-0 z-10 bg-gradient-to-r from-heat via-primary to-cool-intense p-4"
+        className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border p-4"
       >
-        <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-4 max-w-2xl mx-auto">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate(-1)}
-            className="rounded-full text-white hover:bg-white/20 mb-4"
+            className="rounded-full"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="text-white">
-            <h1 className="text-2xl font-bold">{mission.title}</h1>
-            <p className="text-white/90 flex items-center gap-2 mt-1">
-              <MapPin className="w-4 h-4" />
-              {mission.description}
-            </p>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold">{mission.title}</h1>
+            <p className="text-sm text-muted-foreground">{mission.description}</p>
           </div>
         </div>
       </motion.div>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-6 -mt-8">
-        {/* Heat Risk Card */}
-        <Card className="p-6 rounded-3xl bg-card/95 backdrop-blur-sm shadow-xl">
-          <h2 className="font-semibold mb-3">Heat Risk Level</h2>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-muted rounded-full h-4">
-              <div
-                className="bg-gradient-to-r from-heat to-heat-intense h-full rounded-full transition-all animate-pulse-glow"
-                style={{ width: `${mission.heatRisk}%` }}
-              />
+      <div className="max-w-2xl mx-auto p-4 space-y-6">
+        <Card className="p-6 rounded-3xl">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <MapPin className="w-6 h-6 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Standort</p>
+                <p className="font-semibold">
+                  {mission.lat.toFixed(4)}, {mission.lng.toFixed(4)}
+                </p>
+              </div>
             </div>
-            <span className="text-3xl font-bold text-heat">
-              {mission.heatRisk}%
-            </span>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-heat" />
+                  <span className="font-semibold">Heat Risk Score</span>
+                </div>
+                <span className="text-2xl font-bold text-heat">
+                  {mission.heatRisk}%
+                </span>
+              </div>
+              <div className="h-3 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-heat to-heat-intense transition-all"
+                  style={{ width: `${mission.heatRisk}%` }}
+                />
+              </div>
+            </div>
           </div>
         </Card>
 
-        {/* Reasons */}
         <Card className="p-6 rounded-3xl">
-          <h2 className="font-semibold mb-3">Warum ist es hier heiß? 🔥</h2>
-          <ul className="space-y-3">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            🔥 Gründe für die Hitzebelastung
+          </h3>
+          <ul className="space-y-2">
             {mission.reasons.map((reason, i) => (
-              <motion.li
+              <li
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl"
+                className="flex items-start gap-2 text-sm text-muted-foreground"
               >
-                <span className="text-heat text-xl">🔥</span>
-                <span className="flex-1 text-sm">{reason}</span>
-              </motion.li>
+                <span className="text-heat mt-0.5">•</span>
+                {reason}
+              </li>
             ))}
           </ul>
         </Card>
 
-        {/* Actions Checklist */}
         <Card className="p-6 rounded-3xl">
-          <h2 className="font-semibold mb-3">Deine Aktionen ✅</h2>
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            ✅ Vorgeschlagene Aktionen
+          </h3>
           <div className="space-y-3">
             {mission.actions.map((action, i) => (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl hover:bg-muted transition-colors cursor-pointer"
-                onClick={() => toggleAction(i)}
+                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl cursor-pointer hover:bg-muted transition-colors"
+                onClick={() => handleActionToggle(i)}
               >
                 <Checkbox
                   checked={checkedActions.has(i)}
-                  onCheckedChange={() => toggleAction(i)}
-                  className="mt-1"
+                  onCheckedChange={() => handleActionToggle(i)}
+                  className="mt-0.5"
                 />
                 <span className="flex-1 text-sm">{action}</span>
-              </motion.div>
+              </div>
             ))}
           </div>
         </Card>
 
-        {/* Complete Button */}
-        <Button
-          onClick={handleComplete}
-          disabled={mission.completed || checkedActions.size === 0}
-          className="w-full h-14 text-lg rounded-2xl bg-gradient-to-r from-heat via-primary to-cool-intense hover:shadow-xl transition-all"
-        >
-          {mission.completed ? (
-            "✅ Mission abgeschlossen"
-          ) : allActionsChecked ? (
-            "🎉 Mission abschließen (+100 XP)"
-          ) : (
-            `Mission abschließen (${checkedActions.size}/${mission.actions.length})`
-          )}
-        </Button>
+        {!mission.completed && (
+          <Button
+            onClick={handleComplete}
+            disabled={!allActionsChecked}
+            className="w-full h-12 rounded-2xl bg-gradient-to-r from-heat via-primary to-cool-intense hover:shadow-lg disabled:opacity-50"
+          >
+            {allActionsChecked
+              ? "🎉 Mission abschließen (+100 XP)"
+              : "Alle Aktionen abhaken zum Abschließen"}
+          </Button>
+        )}
+
+        {mission.completed && (
+          <Card className="p-6 rounded-3xl bg-gradient-to-r from-primary/10 to-secondary/10 border-2 border-primary">
+            <div className="text-center">
+              <span className="text-4xl mb-2 block">✅</span>
+              <p className="font-bold text-primary">Mission abgeschlossen!</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Gut gemacht! Du hast 100 XP verdient.
+              </p>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

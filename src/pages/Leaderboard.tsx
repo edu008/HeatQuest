@@ -4,7 +4,6 @@ import { useGame } from "@/contexts/GameContext";
 import BottomNav from "@/components/BottomNav";
 import { Trophy, Medal, Award } from "lucide-react";
 
-// Mock leaderboard data
 const mockPlayers = [
   { username: "EcoWarrior", xp: 2500, level: 6, missions: 25 },
   { username: "GreenHero", xp: 2100, level: 5, missions: 21 },
@@ -37,13 +36,16 @@ const Leaderboard = () => {
       case 3:
         return <Award className="w-6 h-6 text-amber-600" />;
       default:
-        return <span className="w-6 text-center font-bold text-muted-foreground">#{rank}</span>;
+        return (
+          <span className="w-6 text-center font-bold text-muted-foreground">
+            #{rank}
+          </span>
+        );
     }
   };
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <motion.div
         initial={{ y: -50 }}
         animate={{ y: 0 }}
@@ -75,17 +77,14 @@ const Leaderboard = () => {
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  {/* Rank */}
                   <div className="flex items-center justify-center w-12">
                     {getIcon(rank)}
                   </div>
 
-                  {/* Avatar */}
                   <div className="w-14 h-14 rounded-full bg-gradient-to-br from-heat to-primary flex items-center justify-center text-2xl">
                     {isCurrentUser ? "👤" : "🧑"}
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-bold">
@@ -104,7 +103,6 @@ const Leaderboard = () => {
                     </div>
                   </div>
 
-                  {/* XP */}
                   <div className="text-right">
                     <p className="text-2xl font-bold text-primary">
                       {player.xp}

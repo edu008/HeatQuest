@@ -38,23 +38,21 @@ const Analyze = () => {
     if (!imageFile) return;
 
     setAnalyzing(true);
-    
-    // Simulate API call with random results
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const mockResult: AnalysisResult = {
       is_hotspot: Math.random() > 0.3,
       heat_risk_score: Math.random() * 0.6 + 0.3,
       reasons: [
-        "Large asphalt area without shade",
-        "No visible vegetation",
-        "High sun exposure during midday",
+        "Große Asphaltfläche ohne Schatten",
+        "Keine sichtbare Vegetation",
+        "Hohe Sonneneinstrahlung zur Mittagszeit",
       ],
       suggested_actions: [
-        "Plant trees along the street",
-        "Install cool reflective surfaces",
-        "Add water features for cooling",
-        "Create shade structures",
+        "Bäume entlang der Straße pflanzen",
+        "Reflektierende Oberflächen installieren",
+        "Wasserflächen zur Kühlung hinzufügen",
+        "Schattenstrukturen errichten",
       ],
     };
 
@@ -65,7 +63,6 @@ const Analyze = () => {
   const createMission = () => {
     if (!result) return;
 
-    // Get current position or use default
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
         const newMission = {
@@ -78,7 +75,6 @@ const Analyze = () => {
           reasons: result.reasons,
           actions: result.suggested_actions,
           completed: false,
-          imageUrl: imagePreview || undefined,
         };
 
         addMission(newMission);
@@ -89,7 +85,6 @@ const Analyze = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <motion.div
         initial={{ y: -50 }}
         animate={{ y: 0 }}
@@ -114,7 +109,6 @@ const Analyze = () => {
       </motion.div>
 
       <div className="max-w-2xl mx-auto p-4 space-y-6">
-        {/* Upload Area */}
         <Card className="p-6 rounded-3xl">
           {!imagePreview ? (
             <label className="flex flex-col items-center justify-center min-h-[300px] cursor-pointer border-2 border-dashed border-border rounded-2xl hover:border-primary transition-colors">
@@ -178,7 +172,6 @@ const Analyze = () => {
           )}
         </Card>
 
-        {/* Analysis Result */}
         {result && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -193,9 +186,7 @@ const Analyze = () => {
                     <div className="flex-1 bg-muted rounded-full h-4">
                       <div
                         className="bg-gradient-to-r from-heat to-heat-intense h-full rounded-full transition-all"
-                        style={{
-                          width: `${result.heat_risk_score * 100}%`,
-                        }}
+                        style={{ width: `${result.heat_risk_score * 100}%` }}
                       />
                     </div>
                     <span className="text-2xl font-bold text-heat">
@@ -220,9 +211,7 @@ const Analyze = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-2">
-                    Vorgeschlagene Aktionen
-                  </h3>
+                  <h3 className="font-semibold mb-2">Vorgeschlagene Aktionen</h3>
                   <ul className="space-y-2">
                     {result.suggested_actions.map((action, i) => (
                       <li

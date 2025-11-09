@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export interface Mission {
   id: string;
@@ -12,7 +12,7 @@ export interface Mission {
   completed: boolean;
 }
 
-export interface UserProfile {
+interface UserProfile {
   username: string;
   xp: number;
   level: number;
@@ -27,16 +27,12 @@ interface GameContextType {
   logout: () => void;
   addMission: (mission: Mission) => void;
   setActiveMission: (mission: Mission | null) => void;
-  completeMission: (missionId: string) => Promise<boolean>;
-  updateMissionActions: (missionId: string, actions: string[]) => void;
-  loadMissions: () => Promise<Mission[]>;  // Neu
-  missionsLoading: boolean;  // Neu
+  completeMission: (missionId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-// Dummy missions für Demo
-const dummyMissions: Mission[] = [
+const initialMissions: Mission[] = [
   {
     id: "1",
     title: "Bahnhofplatz Bern",
@@ -44,16 +40,8 @@ const dummyMissions: Mission[] = [
     lat: 46.9491,
     lng: 7.4386,
     heatRisk: 85,
-    reasons: [
-      "Large asphalt area without shade",
-      "No visible vegetation",
-      "High sun exposure",
-    ],
-    actions: [
-      "Plant trees along the street",
-      "Install cool reflective surfaces",
-      "Add water features for cooling",
-    ],
+    reasons: ["Große Asphaltfläche", "Kein Schatten", "Hohe Sonneneinstrahlung"],
+    actions: ["Bäume pflanzen", "Reflektierende Oberflächen", "Wasserflächen"],
     completed: false,
   },
   {
@@ -63,16 +51,8 @@ const dummyMissions: Mission[] = [
     lat: 47.3699,
     lng: 8.5396,
     heatRisk: 78,
-    reasons: [
-      "Stone surface absorbs heat",
-      "Limited shade areas",
-      "High pedestrian traffic",
-    ],
-    actions: [
-      "Install temporary shade structures",
-      "Create green islands",
-      "Add misting systems",
-    ],
+    reasons: ["Steinflächen absorbieren Hitze", "Wenig Schatten", "Hoher Fußgängerverkehr"],
+    actions: ["Schattenstrukturen", "Grüne Inseln", "Sprühnebel-Systeme"],
     completed: false,
   },
   {
@@ -82,38 +62,24 @@ const dummyMissions: Mission[] = [
     lat: 46.2,
     lng: 6.1422,
     heatRisk: 72,
-    reasons: [
-      "Open square with minimal vegetation",
-      "Dark pavement",
-      "Limited cooling features",
-    ],
-    actions: [
-      "Add portable green walls",
-      "Install solar shade sails",
-      "Plant urban trees",
-    ],
+    reasons: ["Minimale Vegetation", "Dunkles Pflaster", "Wenig Kühlung"],
+    actions: ["Mobile Grünwände", "Solar-Schattensegel", "Stadtbäume pflanzen"],
     completed: false,
   },
 ];
 
-export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [missions, setMissions] = useState<Mission[]>(initialMissions);
   const [activeMission, setActiveMission] = useState<Mission | null>(null);
-  const [missions, setMissions] = useState<Mission[]>(dummyMissions);
-  const [missionsLoading, setMissionsLoading] = useState(false);
 
-  // Load from localStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem("heatquest_user");
-
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const stored = localStorage.getItem("heatquest_user");
+    if (stored) {
+      setUser(JSON.parse(stored));
     }
   }, []);
 
-  // Save to localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem("heatquest_user", JSON.stringify(user));
@@ -121,13 +87,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user]);
 
   const login = (username: string) => {
-    const newUser: UserProfile = {
-      username,
-      xp: 0,
-      level: 1,
-      completedMissions: 0,
-    };
-    setUser(newUser);
+    setUser({ username, xp: 0, level: 1, completedMissions: 0 });
   };
 
   const logout = () => {
@@ -139,11 +99,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     setMissions((prev) => [...prev, mission]);
   };
 
-  const loadMissions = async () => {
-    return missions;
-  };
-
-  const completeMission = async (missionId: string) => {
+  const completeMission = (missionId: string) => {
     setMissions((prev) =>
       prev.map((m) => (m.id === missionId ? { ...m, completed: true } : m))
     );
@@ -159,13 +115,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         completedMissions: user.completedMissions + 1,
       });
     }
-    
-    return true;
-  };
-
-  const updateMissionActions = (missionId: string, actions: string[]) => {
-    // Wird aktuell nicht vom Backend unterstützt, nur lokal
-    console.log('updateMissionActions:', missionId, actions);
   };
 
   return (
@@ -179,9 +128,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         addMission,
         setActiveMission,
         completeMission,
-        updateMissionActions,
-        loadMissions,  // Neu: Funktion zum Laden der Missionen
-        missionsLoading,  // Neu: Loading-Status
       }}
     >
       {children}
@@ -191,7 +137,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useGame = () => {
   const context = useContext(GameContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useGame must be used within GameProvider");
   }
   return context;

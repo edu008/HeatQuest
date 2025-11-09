@@ -23,7 +23,6 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <motion.div
         initial={{ y: -50 }}
         animate={{ y: 0 }}
@@ -54,7 +53,6 @@ const Profile = () => {
       </motion.div>
 
       <div className="max-w-2xl mx-auto p-4 space-y-6 -mt-8">
-        {/* XP Progress */}
         <Card className="p-6 rounded-3xl bg-card/95 backdrop-blur-sm shadow-xl">
           <div className="flex items-center gap-3 mb-3">
             <Flame className="w-6 h-6 text-primary" />
@@ -65,7 +63,9 @@ const Profile = () => {
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Bis Level {(user?.level || 0) + 1}</span>
+              <span className="text-muted-foreground">
+                Bis Level {(user?.level || 0) + 1}
+              </span>
               <span className="font-semibold">{xpToNextLevel} XP</span>
             </div>
             <div className="h-3 bg-muted rounded-full overflow-hidden">
@@ -77,7 +77,6 @@ const Profile = () => {
           </div>
         </Card>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-4">
           <Card className="p-6 rounded-3xl text-center">
             <Trophy className="w-8 h-8 mx-auto mb-2 text-primary" />
@@ -91,7 +90,6 @@ const Profile = () => {
           </Card>
         </div>
 
-        {/* Missions Lists */}
         {completedMissions.length > 0 && (
           <Card className="p-6 rounded-3xl">
             <h2 className="font-semibold mb-4 flex items-center gap-2">
