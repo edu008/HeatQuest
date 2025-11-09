@@ -7,13 +7,15 @@ import { useGame } from "@/contexts/GameContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
-import { Camera } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import MapboxMap from "@/components/MapboxMap";
+import { useHeatmap } from "@/hooks/useHeatmap";
 
 const MapView = () => {
   const { missions, setActiveMission, user } = useGame();
   const { user: authUser, loading } = useAuth();
   const navigate = useNavigate();
+  const { scanCurrentLocation, loading: scanLoading, data: heatmapData } = useHeatmap();
   
   // Mapbox Token aus Environment Variable oder localStorage (Fallback)
   const envToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -26,17 +28,30 @@ const MapView = () => {
     window.location.reload(); // Reload um Token zu aktivieren
   };
 
-  // Warte bis Auth geladen ist, dann prüfe ob User eingeloggt ist
+  // Automatischer Scan beim Laden der Map
   useEffect(() => {
     console.log('🗺️ MapView - Auth status:', { loading, hasUser: !!authUser, email: authUser?.email })
     
     if (!loading && !authUser) {
       console.log('❌ No user found, redirecting to login...')
       navigate("/");
-    } else if (!loading && authUser) {
-      console.log('✅ User authenticated, staying on map')
+      return;
     }
-  }, [authUser, loading, navigate]);
+    
+    if (!loading && authUser && !heatmapData && !scanLoading) {
+      console.log('✅ User authenticated, auto-scanning current location...')
+      // Auto-scan nach kurzer Verzögerung
+      const timer = setTimeout(async () => {
+        try {
+          await scanCurrentLocation(500); // 500m radius
+        } catch (error) {
+          console.error('Auto-scan failed:', error);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [authUser, loading, navigate, heatmapData, scanLoading, scanCurrentLocation]);
 
   const handleMissionClick = (mission: any) => {
     setActiveMission(mission);
@@ -62,13 +77,73 @@ const MapView = () => {
           </div>
           <Button
             onClick={() => navigate("/analyze")}
+            disabled={scanLoading}
             className="rounded-2xl bg-gradient-to-r from-heat to-primary hover:from-heat-intense hover:to-heat shadow-lg"
           >
             <Camera className="w-5 h-5 mr-2" />
-            Analysieren
+            Analyze
           </Button>
         </div>
       </motion.div>
+
+      {/* Loading Indicator */}
+      {scanLoading && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-24 left-4 right-4 z-[999] max-w-md"
+        >
+          <Card className="p-4 bg-card/95 backdrop-blur-sm">
+            <div className="flex items-center space-x-3">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <div>
+                <h3 className="font-bold">Analyzing Area...</h3>
+                <p className="text-sm text-muted-foreground">
+                  Checking if this area was already scanned
+                </p>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Heatmap Data Display */}
+      {!scanLoading && heatmapData && (() => {
+        // Berechne Statistiken aus Grid Cells
+        const hotspots = heatmapData.grid_cells.filter(c => c.is_hotspot);
+        const avgTemp = heatmapData.grid_cells.reduce((sum, c) => sum + c.temp, 0) / heatmapData.grid_cells.length;
+        const avgNdvi = heatmapData.grid_cells.reduce((sum, c) => sum + c.ndvi, 0) / heatmapData.grid_cells.length;
+        
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-24 left-4 right-4 z-[999] max-w-md"
+          >
+            <Card className="p-4 bg-card/95 backdrop-blur-sm">
+              <h3 className="font-bold mb-2">Area Analysis 🔥</h3>
+              <div className="text-sm space-y-1">
+                <p>📊 Total Cells: {heatmapData.total_cells}</p>
+                <p>🔥 Hotspots: {hotspots.length}</p>
+                <p>🌡️ Avg Temp: {avgTemp.toFixed(1)}°C</p>
+                <p>🌿 Avg NDVI: {avgNdvi.toFixed(2)}</p>
+                <p>
+                  {heatmapData.from_cache ? (
+                    <span className="text-green-500">⚡ Previously scanned area</span>
+                  ) : (
+                    <span className="text-blue-500">🆕 Newly scanned area</span>
+                  )}
+                </p>
+                {heatmapData.parent_cell_info && (
+                  <p className="text-xs text-muted-foreground">
+                    📍 Scanned {heatmapData.parent_cell_info.total_scans} time(s) by community
+                  </p>
+                )}
+              </div>
+            </Card>
+          </motion.div>
+        );
+      })()}
 
       {/* Map Area */}
       {mapboxToken ? (
