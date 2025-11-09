@@ -147,86 +147,64 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Initialisiere Auth State
   useEffect(() => {
     console.log('🔄 AuthContext: Initializing...')
-    console.log('🔗 Current URL:', window.location.href)
-    
-    const initAuth = async () => {
-      try {
-        // Prüfe ob OAuth Redirect (URL enthält #access_token oder ?code=)
-        const isOAuthRedirect = window.location.hash.includes('access_token') || window.location.search.includes('code=')
-        
-        if (isOAuthRedirect) {
-          console.log('🔐 OAuth redirect detected! Processing...')
-        }
-        
-        // Hole aktuelle Session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
+
+    // 1) Set up auth listener FIRST (sync only!)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔔 Auth event:', event, session ? 'Session exists' : 'No session')
+
+      // Only synchronous state updates here
+      setSession(session)
+      setUser(session?.user ?? null)
+
+      if (session?.user) {
+        // Defer any Supabase calls to avoid deadlocks
+        setTimeout(() => {
+          if (session.user.app_metadata.provider !== 'email') {
+            console.log('🔐 OAuth user detected (event), ensuring profile...')
+            ensureProfile(session.user.id, session.user.user_metadata)
+          } else {
+            loadProfile(session.user.id)
+          }
+        }, 0)
+      } else {
+        setProfile(null)
+      }
+    })
+
+    // 2) THEN get the existing session
+    supabase.auth
+      .getSession()
+      .then(({ data: { session }, error: sessionError }) => {
         if (sessionError) {
           console.error('❌ Session error:', sessionError)
           setInitError(sessionError.message)
         }
-        
+
         console.log('📦 Initial session:', session ? 'Found' : 'None')
-        
-        if (session) {
-          console.log('📝 Session details:', {
-            user: session.user.email,
-            provider: session.user.app_metadata.provider,
-            expires: new Date(session.expires_at! * 1000).toLocaleString()
-          })
-        }
-        
         setSession(session)
         setUser(session?.user ?? null)
-        
+
         if (session?.user) {
-          console.log('👤 User found:', session.user.email)
-          console.log('🔑 Provider:', session.user.app_metadata.provider)
-          
-          // Bei OAuth: Erstelle/Lade Profil
-          if (session.user.app_metadata.provider !== 'email') {
-            console.log('🔐 OAuth user detected, ensuring profile...')
-            await ensureProfile(session.user.id, session.user.user_metadata)
-          } else {
-            await loadProfile(session.user.id)
-          }
+          setTimeout(() => {
+            if (session.user.app_metadata.provider !== 'email') {
+              console.log('🔐 OAuth user detected (init), ensuring profile...')
+              ensureProfile(session.user.id, session.user.user_metadata)
+            } else {
+              loadProfile(session.user.id)
+            }
+          }, 0)
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error('❌ Auth init error:', err)
         setInitError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
+      })
+      .finally(() => {
         setLoading(false)
         console.log('✅ AuthContext: Ready!')
-      }
-    }
-    
-    initAuth()
-
-    // Höre auf Auth Changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔔 Auth event:', event, session ? 'Session exists' : 'No session')
-      
-      setSession(session)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        console.log('👤 User in event:', session.user.email)
-        console.log('🔑 Provider:', session.user.app_metadata.provider)
-        
-        // Bei OAuth-Login (SIGNED_IN) stelle sicher, dass Profil existiert
-        if (event === 'SIGNED_IN' && session.user.app_metadata.provider !== 'email') {
-          console.log('🔐 OAuth SIGNED_IN, ensuring profile...')
-          await ensureProfile(session.user.id, session.user.user_metadata)
-        } else {
-          await loadProfile(session.user.id)
-        }
-      } else {
-        console.log('❌ No user, clearing profile')
-        setProfile(null)
-      }
-    })
+      })
 
     return () => subscription.unsubscribe()
   }, [])
@@ -234,9 +212,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Sign Up
   const signUp = async (email: string, password: string, username: string) => {
     try {
+      const redirectUrl = `${window.location.origin}/auth/callback`
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: { emailRedirectTo: redirectUrl }
       })
 
       if (error) throw error
