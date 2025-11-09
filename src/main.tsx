@@ -23,14 +23,17 @@ createRoot(document.getElementById("root")!).render(
       <div style={{ position: 'fixed', top: 12, left: 12, zIndex: 99999, background: 'rgba(255,255,0,0.95)', color: '#000', padding: 10, borderRadius: 8 }}>
         Frame OK: QueryClient+Router gerendert
       </div>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<TestPage />} />
-            <Route path="*" element={<TestPage />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      {/* Isoliere potentielle Fehler im Auth+Router Teil */}
+      <ErrorBoundary>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<TestPage />} />
+              <Route path="*" element={<TestPage />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </ErrorBoundary>
     </QueryClientProvider>
   </ErrorBoundary>
 );
