@@ -90,3 +90,6 @@ yarn-debug.log*
 yarn-error.log*
 
 vertex-access.json
+
+# backend and frontend
+package-lock.json
