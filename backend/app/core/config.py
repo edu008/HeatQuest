@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     
     # Supabase Configuration
     SUPABASE_URL: Optional[str] = None
-    SUPABASE_KEY: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None  # ANON Key für Client-Side
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None  # SERVICE_ROLE Key für Backend (bypassed RLS)
     
     # Vertex AI Configuration
     vertex_service_account_path: str = "vertex-access.json"

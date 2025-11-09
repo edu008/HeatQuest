@@ -8,6 +8,7 @@ export interface HeatmapRequest {
   radius_m?: number;
   cell_size_m?: number;
   use_cache?: boolean;
+  user_id?: string; // For automatic mission generation
 }
 
 export interface GridCell {
@@ -63,6 +64,12 @@ class HeatmapService {
       use_batch: 'true',
       format: 'json',
     });
+
+    // Add user_id if provided (for automatic mission generation)
+    if (request.user_id) {
+      params.append('user_id', request.user_id);
+      console.log('🎯 Including user_id for mission generation:', request.user_id);
+    }
 
     try {
       const response = await fetch(

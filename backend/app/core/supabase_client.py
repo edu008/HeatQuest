@@ -12,12 +12,24 @@ class SupabaseService:
     
     def __init__(self):
         """Initialize Supabase client"""
-        if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
-            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set")
+        if not settings.SUPABASE_URL:
+            raise ValueError("SUPABASE_URL must be set")
+        
+        # Verwende SERVICE_ROLE_KEY falls vorhanden (bypassed RLS), sonst ANON KEY
+        supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+        
+        if not supabase_key:
+            raise ValueError("SUPABASE_SERVICE_ROLE_KEY oder SUPABASE_KEY must be set")
+        
+        # Logge welcher Key-Typ verwendet wird
+        if settings.SUPABASE_SERVICE_ROLE_KEY:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("🔑 Supabase: Verwende SERVICE_ROLE_KEY (bypassed RLS)")
         
         self.client: Client = create_client(
             settings.SUPABASE_URL,
-            settings.SUPABASE_KEY
+            supabase_key
         )
     
     # ============ User Profile Operations ============

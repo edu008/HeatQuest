@@ -207,6 +207,22 @@ class ParentCellService:
             child_cells = response.data or []
             logger.info(f"✅ {len(child_cells)} Child-Cells geladen")
             
+            # Debug: Prüfe ob 'analyzed' Feld vorhanden ist
+            if child_cells:
+                first_cell = child_cells[0]
+                has_analyzed_field = 'analyzed' in first_cell
+                analyzed_value = first_cell.get('analyzed', 'FIELD_NOT_PRESENT')
+                logger.info(f"   Debug: 'analyzed' Feld vorhanden: {has_analyzed_field}, Wert: {analyzed_value}")
+                
+                # Zähle Status (analyzed = True bedeutet "muss noch analysiert werden")
+                needs_analysis_count = sum(1 for c in child_cells if c.get('analyzed') == True)
+                already_done_count = sum(1 for c in child_cells if c.get('analyzed') == False)
+                
+                if needs_analysis_count > 0:
+                    logger.info(f"   🔄 {needs_analysis_count} cells warten auf KI-Analyse (analyzed=True)")
+                if already_done_count > 0:
+                    logger.info(f"   ✅ {already_done_count} cells bereits analysiert (analyzed=False)")
+            
             return child_cells
         
         except Exception as e:
@@ -234,6 +250,11 @@ class ParentCellService:
             # Konvertiere zu DB-Format
             child_cells_data = []
             for cell in grid_cells:
+                # WICHTIG: 'analyzed' bedeutet "muss noch analysiert werden"
+                # - analyzed = True → Zelle mit Heat Score >= 11, wartet auf KI-Analyse
+                # - analyzed = False → Zelle wurde bereits analysiert ODER Heat Score < 11
+                needs_analysis = cell.heat_score >= 11.0 if cell.heat_score else False
+                
                 child_data = {
                     'parent_cell_id': parent_cell_id,
                     'cell_id': cell.cell_id,
@@ -248,7 +269,8 @@ class ParentCellService:
                     'heat_score': cell.heat_score,
                     'cell_size_m': 30,  # TODO: Dynamisch
                     'pixel_count': cell.pixel_count,
-                    'is_hotspot': cell.heat_score > 28 if cell.heat_score else False
+                    'is_hotspot': cell.heat_score > 28 if cell.heat_score else False,
+                    'analyzed': needs_analysis  # ✅ True wenn Heat Score >= 11 (muss analysiert werden)
                 }
                 child_cells_data.append(child_data)
             
@@ -256,7 +278,12 @@ class ParentCellService:
             response = supabase_service.client.table('child_cells').insert(child_cells_data).execute()
             
             saved_cells = response.data or []
+            
+            # Debug: Zeige wie viele Zellen auf Analyse warten
+            cells_to_analyze = sum(1 for c in child_cells_data if c.get('analyzed') == True)
             logger.info(f"✅ {len(saved_cells)} Child-Cells gespeichert!")
+            if cells_to_analyze > 0:
+                logger.info(f"   🔄 {cells_to_analyze} Zellen warten auf KI-Analyse (Heat Score >= 11.0)")
             
             # Trigger updatet automatisch Parent-Cell-Stats
             

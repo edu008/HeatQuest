@@ -1,17 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useMissions, Mission as MissionType } from "../hooks/useMissions";
 
-export interface Mission {
-  id: string;
-  title: string;
-  description: string;
-  lat: number;
-  lng: number;
-  heatRisk: number;
-  reasons: string[];
-  actions: string[];
-  completed: boolean;
-  imageUrl?: string;
-}
+export type Mission = MissionType;
 
 export interface UserProfile {
   username: string;
@@ -28,8 +18,10 @@ interface GameContextType {
   logout: () => void;
   addMission: (mission: Mission) => void;
   setActiveMission: (mission: Mission | null) => void;
-  completeMission: (missionId: string) => void;
+  completeMission: (missionId: string) => Promise<boolean>;
   updateMissionActions: (missionId: string, actions: string[]) => void;
+  loadMissions: () => Promise<Mission[]>;  // Neu
+  missionsLoading: boolean;  // Neu
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -99,19 +91,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [missions, setMissions] = useState<Mission[]>(dummyMissions);
   const [activeMission, setActiveMission] = useState<Mission | null>(null);
+  
+  // Verwende den useMissions Hook für echte Missionen vom Backend
+  const {
+    missions,
+    loading: missionsLoading,
+    loadMissions,
+    completeMission: completeMissionAPI,
+    addMission: addMissionLocal,
+  } = useMissions();
 
   // Load from localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("heatquest_user");
-    const storedMissions = localStorage.getItem("heatquest_missions");
 
     if (storedUser) {
       setUser(JSON.parse(storedUser));
-    }
-    if (storedMissions) {
-      setMissions(JSON.parse(storedMissions));
     }
   }, []);
 
@@ -121,10 +117,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("heatquest_user", JSON.stringify(user));
     }
   }, [user]);
-
-  useEffect(() => {
-    localStorage.setItem("heatquest_missions", JSON.stringify(missions));
-  }, [missions]);
 
   const login = (username: string) => {
     const newUser: UserProfile = {
@@ -142,15 +134,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addMission = (mission: Mission) => {
-    setMissions((prev) => [...prev, mission]);
+    addMissionLocal(mission);
   };
 
-  const completeMission = (missionId: string) => {
-    setMissions((prev) =>
-      prev.map((m) => (m.id === missionId ? { ...m, completed: true } : m))
-    );
-
-    if (user) {
+  const completeMission = async (missionId: string) => {
+    const success = await completeMissionAPI(missionId);
+    
+    if (success && user) {
       const xpGain = 100;
       const newXp = user.xp + xpGain;
       const newLevel = Math.floor(newXp / 500) + 1;
@@ -161,12 +151,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         completedMissions: user.completedMissions + 1,
       });
     }
+    
+    return success;
   };
 
   const updateMissionActions = (missionId: string, actions: string[]) => {
-    setMissions((prev) =>
-      prev.map((m) => (m.id === missionId ? { ...m, actions } : m))
-    );
+    // Wird aktuell nicht vom Backend unterstützt, nur lokal
+    console.log('updateMissionActions:', missionId, actions);
   };
 
   return (
@@ -181,6 +172,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         setActiveMission,
         completeMission,
         updateMissionActions,
+        loadMissions,  // Neu: Funktion zum Laden der Missionen
+        missionsLoading,  // Neu: Loading-Status
       }}
     >
       {children}

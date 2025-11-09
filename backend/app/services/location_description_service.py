@@ -320,19 +320,21 @@ class LocationDescriptionService:
         
         # 2. KI-Analyse durchführen
         logger.info("🤖 Schritt 2/2: KI-Analyse durchführen...")
-        description, ai_provider = self._analyze_image_with_ai(image_path)
+        analysis_dict, ai_provider = self._analyze_image_with_ai(image_path)
         logger.info(f"✅ KI-Analyse abgeschlossen!")
         logger.info(f"   Anbieter: {ai_provider}")
-        logger.info(f"   Beschreibung ({len(description)} Zeichen): {description[:100]}...")
+        logger.info(f"   Beschreibung ({len(analysis_dict['description'])} Zeichen): {analysis_dict['description'][:100]}...")
         
         result = {
-            "description": description,
+            "description": analysis_dict["description"],
+            "main_cause": analysis_dict["main_cause"],
+            "suggested_actions": analysis_dict["suggested_actions"],
             "lat": lat,
             "lon": lon,
             "image_path": str(image_path),
             "image_provider": provider,
             "ai_provider": ai_provider,
-            "confidence": "high" if description else "low"
+            "confidence": "high" if analysis_dict["description"] else "low"
         }
         
         logger.info("=" * 70)
@@ -466,7 +468,45 @@ class LocationDescriptionService:
         logger.info(f"✅ Google Maps: Bild abgerufen ({len(response.content)} bytes)")
         return True, "Google Maps Satellite"
     
-    def _analyze_image_with_ai(self, image_path: Path) -> Tuple[str, str]:
+    def _parse_json_response(self, text: str) -> Dict:
+        """
+        Extrahiert und parsed JSON aus KI-Response (robust gegen Markdown-Blöcke).
+        
+        Returns:
+            Dictionary mit description, main_cause, suggested_actions
+        """
+        try:
+            # Entferne Markdown-Code-Blöcke (```json ... ```)
+            if "```" in text:
+                parts = text.split("```")
+                for part in parts:
+                    part = part.strip()
+                    if part.startswith("json"):
+                        part = part[4:].strip()
+                    if part.startswith("{") and part.endswith("}"):
+                        text = part
+                        break
+            
+            # Parse JSON
+            data = json.loads(text)
+            
+            # Validiere erforderliche Felder
+            return {
+                "description": data.get("description", "No description available"),
+                "main_cause": data.get("main_cause", "Unknown cause"),
+                "suggested_actions": data.get("suggested_actions", [])
+            }
+        
+        except json.JSONDecodeError as e:
+            logger.warning(f"⚠️ JSON-Parsing fehlgeschlagen: {e}")
+            # Fallback: Nutze Text als Beschreibung
+            return {
+                "description": text.strip(),
+                "main_cause": "Analysis incomplete",
+                "suggested_actions": []
+            }
+    
+    def _analyze_image_with_ai(self, image_path: Path) -> Tuple[Dict, str]:
         """
         Analysiert Satellitenbild mit Vision-KI.
         Unterstützt mehrere KI-Anbieter mit automatischem Fallback.
@@ -475,7 +515,7 @@ class LocationDescriptionService:
             image_path: Pfad zum Satellitenbild
         
         Returns:
-            Tuple (Beschreibung, KI-Anbieter-Name)
+            Tuple (Analysis-Dict, KI-Anbieter-Name)
         """
         # Versuche verschiedene KI-Anbieter (Vertex AI zuerst, dann Gemini direkt, dann OpenAI)
         analyzers = [
@@ -486,26 +526,26 @@ class LocationDescriptionService:
         
         for analyzer_func in analyzers:
             try:
-                description, provider_name = analyzer_func(image_path)
-                if description:
-                    return description, provider_name
+                analysis_dict, provider_name = analyzer_func(image_path)
+                if analysis_dict and analysis_dict.get("description"):
+                    return analysis_dict, provider_name
             except Exception as e:
                 logger.warning(f"⚠️ {analyzer_func.__name__} fehlgeschlagen: {e}")
                 continue
         
         raise Exception("Alle Vision-KI-Anbieter fehlgeschlagen")
     
-    def _analyze_with_vertex_ai(self, image_path: Path) -> Tuple[str, str]:
+    def _analyze_with_vertex_ai(self, image_path: Path) -> Tuple[Dict, str]:
         """
         Analysiert Bild mit Google Vertex AI Vision.
         Verwendet Service Account JSON für Authentifizierung.
         
         Returns:
-            Tuple (Beschreibung, Anbieter-Name)
+            Tuple (Analysis-Dict, Anbieter-Name)
         """
         if not self.vertex_credentials or not self.vertex_project_id:
             logger.debug("Vertex AI Credentials nicht geladen")
-            return "", "Google Vertex AI"
+            return {}, "Google Vertex AI"
         
         logger.info("🤖 Versuche Google Vertex AI Vision...")
         
@@ -513,7 +553,7 @@ class LocationDescriptionService:
         access_token = self._get_vertex_access_token()
         if not access_token:
             logger.error("❌ Konnte kein Vertex AI Access Token generieren")
-            return "", "Google Vertex AI"
+            return {}, "Google Vertex AI"
         
         # Bild als Base64 kodieren
         with open(image_path, 'rb') as f:
@@ -525,12 +565,18 @@ class LocationDescriptionService:
             "Authorization": f"Bearer {access_token}"
         }
         
-        # Prompt für Satellitenbild-Analyse (auf Englisch)
+        # Prompt für Satellitenbild-Analyse (auf Englisch) - mit strukturierter Ausgabe
         prompt = (
-            "Describe precisely and in natural language what can be seen in this "
-            "satellite image. Focus on: buildings, streets, green spaces, water bodies, "
-            "parks, building density. Keep the description short (2-3 sentences) and "
-            "in everyday language."
+            "Analyze this satellite image for heat stress factors. Respond ONLY with valid JSON in this exact format:\n\n"
+            "{\n"
+            '  "description": "Brief 2-3 sentence description of what is visible (buildings, streets, green spaces, etc.)",\n'
+            '  "main_cause": "Primary cause of heat stress in this area",\n'
+            '  "suggested_actions": [\n'
+            '    {"priority": "high/medium/low", "action": "Action name", "description": "Brief explanation"}\n'
+            "  ]\n"
+            "}\n\n"
+            "Focus on urban heat factors: asphalt, building density, lack of vegetation, sealed surfaces. "
+            "Suggest 2-4 concrete cooling measures. Keep all text concise and in English."
         )
         
         payload = {
@@ -551,7 +597,7 @@ class LocationDescriptionService:
                 }
             ],
             "generationConfig": {
-                "maxOutputTokens": 300,
+                "maxOutputTokens": 800,
                 "temperature": 0.4
             }
         }
@@ -565,7 +611,7 @@ class LocationDescriptionService:
         
         if not model_name:
             logger.error("❌ Kein verfügbares Gemini-Modell gefunden")
-            return "", "Google Vertex AI"
+            return {}, "Google Vertex AI"
         
         logger.info(f"   Verwende Modell: {model_name}")
         
@@ -590,12 +636,13 @@ class LocationDescriptionService:
                 # Prüfe ob Antwort vorhanden
                 if 'candidates' not in result or len(result['candidates']) == 0:
                     logger.error(f"❌ Keine Antwort von Vertex AI: {result}")
-                    return "", "Google Vertex AI"
+                    return {}, "Google Vertex AI"
                 
-                description = result['candidates'][0]['content']['parts'][0]['text'].strip()
+                raw_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
+                analysis_dict = self._parse_json_response(raw_text)
                 
-                logger.info(f"✅ Vertex AI: Analyse abgeschlossen mit {model_name} ({len(description)} Zeichen)")
-                return description, f"Google Vertex AI ({model_name})"
+                logger.info(f"✅ Vertex AI: Analyse abgeschlossen mit {model_name}")
+                return analysis_dict, f"Google Vertex AI ({model_name})"
             
             else:
                 # Fehler
@@ -619,19 +666,19 @@ class LocationDescriptionService:
             logger.error(f"❌ Fehler bei Vertex AI Request: {e}")
             raise
         
-        return "", "Google Vertex AI"
+        return {}, "Google Vertex AI"
     
-    def _analyze_with_gemini_direct(self, image_path: Path) -> Tuple[str, str]:
+    def _analyze_with_gemini_direct(self, image_path: Path) -> Tuple[Dict, str]:
         """
         Analysiert Bild mit Google Gemini API (direkt, ohne Vertex AI).
         Einfachere Alternative wenn Vertex AI nicht verfügbar ist.
         
         Returns:
-            Tuple (Beschreibung, Anbieter-Name)
+            Tuple (Analysis-Dict, Anbieter-Name)
         """
         if not settings.google_gemini_api_key:
             logger.debug("Google Gemini API Key nicht konfiguriert")
-            return "", "Google Gemini"
+            return {}, "Google Gemini"
         
         logger.info("🤖 Versuche Google Gemini API (direkt)...")
         
@@ -639,12 +686,18 @@ class LocationDescriptionService:
         with open(image_path, 'rb') as f:
             image_data = base64.b64encode(f.read()).decode('utf-8')
         
-        # Prompt für Satellitenbild-Analyse (auf Englisch)
+        # Prompt für Satellitenbild-Analyse (auf Englisch) - mit strukturierter Ausgabe
         prompt = (
-            "Describe precisely and in natural language what can be seen in this "
-            "satellite image. Focus on: buildings, streets, green spaces, water bodies, "
-            "parks, building density. Keep the description short (2-3 sentences) and "
-            "in everyday language."
+            "Analyze this satellite image for heat stress factors. Respond ONLY with valid JSON in this exact format:\n\n"
+            "{\n"
+            '  "description": "Brief 2-3 sentence description of what is visible (buildings, streets, green spaces, etc.)",\n'
+            '  "main_cause": "Primary cause of heat stress in this area",\n'
+            '  "suggested_actions": [\n'
+            '    {"priority": "high/medium/low", "action": "Action name", "description": "Brief explanation"}\n'
+            "  ]\n"
+            "}\n\n"
+            "Focus on urban heat factors: asphalt, building density, lack of vegetation, sealed surfaces. "
+            "Suggest 2-4 concrete cooling measures. Keep all text concise and in English."
         )
         
         # Gemini API Request (vereinfachter Zugang)
@@ -665,7 +718,7 @@ class LocationDescriptionService:
                 }
             ],
             "generationConfig": {
-                "maxOutputTokens": 300,
+                "maxOutputTokens": 800,
                 "temperature": 0.4
             }
         }
@@ -678,23 +731,24 @@ class LocationDescriptionService:
         # Prüfe ob Antwort vorhanden
         if 'candidates' not in result or len(result['candidates']) == 0:
             logger.error(f"❌ Keine Antwort von Gemini API: {result}")
-            return "", "Google Gemini"
+            return {}, "Google Gemini"
         
-        description = result['candidates'][0]['content']['parts'][0]['text'].strip()
+        raw_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
+        analysis_dict = self._parse_json_response(raw_text)
         
-        logger.info(f"✅ Gemini API: Analyse abgeschlossen ({len(description)} Zeichen)")
-        return description, "Google Gemini API (direkt)"
+        logger.info(f"✅ Gemini API: Analyse abgeschlossen")
+        return analysis_dict, "Google Gemini API (direkt)"
     
-    def _analyze_with_openai(self, image_path: Path) -> Tuple[str, str]:
+    def _analyze_with_openai(self, image_path: Path) -> Tuple[Dict, str]:
         """
         Analysiert Bild mit OpenAI GPT-4 Vision.
         
         Returns:
-            Tuple (Beschreibung, Anbieter-Name)
+            Tuple (Analysis-Dict, Anbieter-Name)
         """
         if not settings.openai_api_key:
             logger.debug("OpenAI API Key nicht konfiguriert")
-            return "", "OpenAI GPT-4 Vision"
+            return {}, "OpenAI GPT-4 Vision"
         
         logger.info("🤖 Versuche OpenAI GPT-4 Vision...")
         
@@ -717,10 +771,16 @@ class LocationDescriptionService:
                         {
                             "type": "text",
                             "text": (
-                                "Describe precisely and in natural language what can be seen in this "
-                                "satellite image. Focus on: buildings, streets, green spaces, water bodies, "
-                                "parks, building density. Keep the description short (2-3 sentences) and "
-                                "in everyday language."
+                                "Analyze this satellite image for heat stress factors. Respond ONLY with valid JSON in this exact format:\n\n"
+                                "{\n"
+                                '  "description": "Brief 2-3 sentence description of what is visible (buildings, streets, green spaces, etc.)",\n'
+                                '  "main_cause": "Primary cause of heat stress in this area",\n'
+                                '  "suggested_actions": [\n'
+                                '    {"priority": "high/medium/low", "action": "Action name", "description": "Brief explanation"}\n'
+                                "  ]\n"
+                                "}\n\n"
+                                "Focus on urban heat factors: asphalt, building density, lack of vegetation, sealed surfaces. "
+                                "Suggest 2-4 concrete cooling measures. Keep all text concise and in English."
                             )
                         },
                         {
@@ -732,7 +792,7 @@ class LocationDescriptionService:
                     ]
                 }
             ],
-            "max_tokens": 300
+            "max_tokens": 800
         }
         
         response = requests.post(
@@ -744,10 +804,11 @@ class LocationDescriptionService:
         response.raise_for_status()
         
         result = response.json()
-        description = result['choices'][0]['message']['content'].strip()
+        raw_text = result['choices'][0]['message']['content'].strip()
+        analysis_dict = self._parse_json_response(raw_text)
         
-        logger.info(f"✅ OpenAI: Analyse abgeschlossen ({len(description)} Zeichen)")
-        return description, "OpenAI GPT-4 Vision"
+        logger.info(f"✅ OpenAI: Analyse abgeschlossen")
+        return analysis_dict, "OpenAI GPT-4 Vision"
 
 
 # Singleton-Instanz

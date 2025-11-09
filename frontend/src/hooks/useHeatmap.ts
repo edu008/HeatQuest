@@ -54,6 +54,7 @@ export const useHeatmap = () => {
         longitude: location.longitude,
         radius_m,
         use_cache: true, // Backend checkt automatisch Cache
+        user_id: user.id, // For automatic mission generation
       });
 
       setState(prev => ({ 
@@ -117,31 +118,15 @@ export const useHeatmap = () => {
     try {
       console.log(`🌡️ Scanning coordinates: ${latitude}, ${longitude}`);
 
-      // Erst Cache prüfen
-      const cachedData = await heatmapService.getCachedHeatmap(
-        latitude,
-        longitude,
-        radius_m
-      );
-
-      if (cachedData) {
-        console.log('✅ Found cached data');
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          data: cachedData 
-        }));
-        toast.success('Loaded from cache! ⚡');
-        return cachedData;
-      }
-
-      // Sonst neuer Scan
+      // Request heatmap with user_id for mission generation
       toast.loading('Scanning...', { duration: 30000 });
-      const heatmapData = await heatmapService.scanNewLocation(
+      const heatmapData = await heatmapService.getHeatmapForLocation({
         latitude,
         longitude,
-        radius_m
-      );
+        radius_m,
+        use_cache: true,
+        user_id: user.id, // For automatic mission generation
+      });
 
       setState(prev => ({ 
         ...prev, 

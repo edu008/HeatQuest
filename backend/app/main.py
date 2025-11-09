@@ -10,6 +10,7 @@ import logging
 from app.core.config import settings
 from app.api.v1.heatmap import router as heatmap_router
 from app.api.v1.location_description import router as location_description_router
+from app.api.v1.missions import router as missions_router
 from app.api.v1.test_supabase import router as test_router
 
 # Logging konfigurieren
@@ -41,6 +42,7 @@ app.add_middleware(
 # Router einbinden
 app.include_router(heatmap_router)
 app.include_router(location_description_router)
+app.include_router(missions_router)
 app.include_router(test_router)
 
 
@@ -63,9 +65,16 @@ async def root():
                 ]
             },
             "location_description": {
-                "description": "KI-basierte Standortbeschreibung aus Satellitenbildern",
+                "description": "🤖 KI-basierte Standortbeschreibung aus Satellitenbildern",
                 "endpoints": [
                     "/api/v1/describe-location"
+                ]
+            },
+            "missions": {
+                "description": "🎯 Mission-Management und Auto-Generierung",
+                "endpoints": [
+                    "/api/v1/missions",
+                    "/api/v1/missions/generate"
                 ]
             }
         }

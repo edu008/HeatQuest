@@ -12,7 +12,7 @@ import MapboxMap from "@/components/MapboxMap";
 import { useHeatmap } from "@/hooks/useHeatmap";
 
 const MapView = () => {
-  const { missions, setActiveMission, user } = useGame();
+  const { missions, setActiveMission, user, loadMissions, missionsLoading } = useGame();
   const { user: authUser, loading } = useAuth();
   const navigate = useNavigate();
   const { scanCurrentLocation, loading: scanLoading, data: heatmapData } = useHeatmap();
@@ -52,6 +52,23 @@ const MapView = () => {
       return () => clearTimeout(timer);
     }
   }, [authUser, loading, navigate, heatmapData, scanLoading, scanCurrentLocation]);
+
+  // Lade Missionen automatisch nach einem erfolgreichen Scan
+  useEffect(() => {
+    if (!scanLoading && heatmapData && authUser && loadMissions) {
+      console.log('🎯 Scan completed, loading missions for user...');
+      const timer = setTimeout(async () => {
+        try {
+          const loadedMissions = await loadMissions();
+          console.log(`✅ ${loadedMissions.length} missions loaded!`);
+        } catch (error) {
+          console.error('❌ Failed to load missions:', error);
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [heatmapData, scanLoading, authUser, loadMissions]);
 
   const handleMissionClick = (mission: any) => {
     setActiveMission(mission);
@@ -113,6 +130,7 @@ const MapView = () => {
         const hotspots = heatmapData.grid_cells.filter(c => c.is_hotspot);
         const avgTemp = heatmapData.grid_cells.reduce((sum, c) => sum + c.temp, 0) / heatmapData.grid_cells.length;
         const avgNdvi = heatmapData.grid_cells.reduce((sum, c) => sum + c.ndvi, 0) / heatmapData.grid_cells.length;
+        const openMissions = missions.filter(m => !m.completed);
         
         return (
           <motion.div
@@ -138,6 +156,16 @@ const MapView = () => {
                   <p className="text-xs text-muted-foreground">
                     📍 Scanned {heatmapData.parent_cell_info.total_scans} time(s) by community
                   </p>
+                )}
+                {missionsLoading ? (
+                  <p className="text-blue-500 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading missions...
+                  </p>
+                ) : openMissions.length > 0 ? (
+                  <p className="text-green-500">🎯 {openMissions.length} mission(s) available nearby!</p>
+                ) : (
+                  <p className="text-muted-foreground">✨ No missions in this area yet</p>
                 )}
               </div>
             </Card>
