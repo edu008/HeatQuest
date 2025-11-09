@@ -1,6 +1,6 @@
 """
-Location-Description-API-Endpunkte.
-REST-API für KI-basierte Standortbeschreibung aus Satellitenbildern.
+Location Description API Endpoints.
+REST API for AI-based location description from satellite imagery.
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,97 +20,97 @@ router = APIRouter(prefix="/api/v1", tags=["location-description"])
 @router.get(
     "/describe-location",
     response_model=LocationDescriptionResponse,
-    summary="KI-Beschreibung eines Standorts",
-    description="Ruft Satellitenbild ab und analysiert es mit Vision-KI"
+    summary="AI description of a location",
+    description="Fetches a satellite image and analyzes it with Vision AI"
 )
 async def describe_location(
     lat: float = Query(
         ...,
-        description="Breitengrad",
+        description="Latitude",
         ge=-90,
         le=90,
         example=51.5074
     ),
     lon: float = Query(
         ...,
-        description="Längengrad",
+        description="Longitude",
         ge=-180,
         le=180,
         example=-0.1278
     ),
     zoom: Optional[int] = Query(
         17,
-        description="Zoom-Level (1-20, Standard: 17)",
+        description="Zoom level (1–20, default: 17)",
         ge=1,
         le=20,
         example=17
     ),
     width: Optional[int] = Query(
         640,
-        description="Bildbreite in Pixeln (Standard: 640)",
+        description="Image width in pixels (default: 640)",
         ge=100,
         le=1280,
         example=640
     ),
     height: Optional[int] = Query(
         640,
-        description="Bildhöhe in Pixeln (Standard: 640)",
+        description="Image height in pixels (default: 640)",
         ge=100,
         le=1280,
         example=640
     )
 ):
     """
-    🤖 **KI-BASIERTE STANDORTBESCHREIBUNG**
+    🤖 **AI-BASED LOCATION DESCRIPTION**
     
-    Automatische Analyse eines Standorts anhand von Satellitenbildern:
-    1. Ruft hochauflösendes Satellitenbild für Koordinaten ab
-    2. Speichert Bild lokal
-    3. Analysiert Bildinhalt mit Vision-KI
-    4. Gibt natürlichsprachige Beschreibung zurück
+    Automatically analyzes a location using satellite imagery:
+    1. Fetches a high-resolution satellite image for given coordinates
+    2. Saves the image locally
+    3. Analyzes the image using Vision AI
+    4. Returns a natural language description
     
-    **Beispiel-URL:**
+    **Example URL:**
     ```
     /api/v1/describe-location?lat=51.5074&lon=-0.1278&zoom=17
     ```
     
-    **Response enthält:**
-    - KI-generierte Beschreibung (2-3 Sätze)
-    - Koordinaten
-    - Pfad zum gespeicherten Bild
-    - Verwendete Anbieter (Bild + KI)
-    - Konfidenz der Analyse
+    **Response includes:**
+    - AI-generated description (2–3 sentences)
+    - Coordinates
+    - Path to saved image
+    - Providers used (image + AI)
+    - Confidence score of the analysis
     
-    **Unterstützte Bildquellen:**
-    - Mapbox Satellite (verwendet MAP env variable)
-    - Google Maps Satellite (Fallback)
+    **Supported image sources:**
+    - Mapbox Satellite (uses MAP env variable)
+    - Google Maps Satellite (fallback)
     
-    **Unterstützte KI-Anbieter:**
-    - Google Vertex AI / Gemini Vision (verwendet VERTEX env variable)
-    - OpenAI GPT-4 Vision (Fallback)
+    **Supported AI providers:**
+    - Google Vertex AI / Gemini Vision (uses VERTEX env variable)
+    - OpenAI GPT-4 Vision (fallback)
     
-    **Was wird erkannt:**
-    - Gebäude und Bebauungsdichte
-    - Straßen und Verkehrswege
-    - Grünflächen und Parks
-    - Gewässer (Flüsse, Seen)
-    - Stadtstruktur und Landnutzung
+    **Detectable features:**
+    - Buildings and density
+    - Roads and traffic networks
+    - Green spaces and parks
+    - Water bodies (rivers, lakes)
+    - Urban structure and land use
     
-    **Parameter:**
-    - **lat, lon**: GPS-Koordinaten (z.B. London: 51.5074, -0.1278)
-    - **zoom**: Detailgrad (17 = Straßenebene, 14 = Stadtteilebene)
-    - **width, height**: Bildgröße (Standard: 640x640px)
+    **Parameters:**
+    - **lat, lon**: GPS coordinates (e.g., London: 51.5074, -0.1278)
+    - **zoom**: Level of detail (17 = street level, 14 = neighborhood)
+    - **width, height**: Image size (default: 640x640px)
     
-    **Konfiguration:**
+    **Configuration:**
     - Mapbox: `MAP` in .env
-    - Vertex AI: `vertex-access.json` im Backend-Root (bereits vorhanden! ✅)
-    - Optional: Weitere Anbieter in .env
+    - Vertex AI: `vertex-access.json` in backend root (already provided ✅)
+    - Optional: Other providers can be added via .env
     """
     
     try:
         logger.info(f"🌍 Location Description Request: ({lat}, {lon}), Zoom={zoom}")
         
-        # Rufe Service auf
+        # Call the service
         result = location_description_service.describe_location(
             lat=lat,
             lon=lon,
@@ -119,10 +119,10 @@ async def describe_location(
             height=height
         )
         
-        # Erstelle Response
+        # Create response
         response = LocationDescriptionResponse(**result)
         
-        logger.info(f"✅ Location Description erfolgreich: {result['ai_provider']}")
+        logger.info(f"✅ Location description successful: {result['ai_provider']}")
         
         return response
     
@@ -130,27 +130,27 @@ async def describe_location(
         raise
     
     except Exception as e:
-        logger.error(f"❌ Fehler bei Location Description: {e}", exc_info=True)
+        logger.error(f"❌ Error in Location Description: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fehler bei der Verarbeitung: {str(e)}"
+            detail=f"Error during processing: {str(e)}"
         )
 
 
 @router.post(
     "/describe-location",
     response_model=LocationDescriptionResponse,
-    summary="KI-Beschreibung eines Standorts (POST)",
-    description="Ruft Satellitenbild ab und analysiert es mit Vision-KI (POST-Variante)"
+    summary="AI description of a location (POST)",
+    description="Fetches a satellite image and analyzes it with Vision AI (POST version)"
 )
 async def describe_location_post(request: LocationDescriptionRequest):
     """
-    🤖 **KI-BASIERTE STANDORTBESCHREIBUNG (POST)**
+    🤖 **AI-BASED LOCATION DESCRIPTION (POST)**
     
-    POST-Variante des describe-location Endpoints.
-    Nimmt JSON-Body statt Query-Parameter.
+    POST version of the describe-location endpoint.
+    Accepts a JSON body instead of query parameters.
     
-    **Beispiel-Request:**
+    **Example Request:**
     ```json
     {
         "lat": 51.5074,
@@ -161,13 +161,13 @@ async def describe_location_post(request: LocationDescriptionRequest):
     }
     ```
     
-    Siehe GET-Variante für Details.
+    See the GET version for details.
     """
     
     try:
         logger.info(f"🌍 Location Description Request (POST): ({request.lat}, {request.lon})")
         
-        # Rufe Service auf
+        # Call the service
         result = location_description_service.describe_location(
             lat=request.lat,
             lon=request.lon,
@@ -176,10 +176,10 @@ async def describe_location_post(request: LocationDescriptionRequest):
             height=request.height
         )
         
-        # Erstelle Response
+        # Create response
         response = LocationDescriptionResponse(**result)
         
-        logger.info(f"✅ Location Description erfolgreich: {result['ai_provider']}")
+        logger.info(f"✅ Location description successful: {result['ai_provider']}")
         
         return response
     
@@ -187,56 +187,56 @@ async def describe_location_post(request: LocationDescriptionRequest):
         raise
     
     except Exception as e:
-        logger.error(f"❌ Fehler bei Location Description: {e}", exc_info=True)
+        logger.error(f"❌ Error in Location Description: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fehler bei der Verarbeitung: {str(e)}"
+            detail=f"Error during processing: {str(e)}"
         )
 
 
 @router.get(
     "/satellite-image/{lat}/{lon}",
     response_class=FileResponse,
-    summary="Satellitenbild abrufen",
-    description="Gibt das gespeicherte Satellitenbild zurück"
+    summary="Retrieve satellite image",
+    description="Returns the saved satellite image"
 )
 async def get_satellite_image(
     lat: float,
     lon: float
 ):
     """
-    📷 **SATELLITENBILD ANZEIGEN**
+    📷 **SHOW SATELLITE IMAGE**
     
-    Gibt das zuletzt für diese Koordinaten abgerufene Satellitenbild zurück.
+    Returns the most recently fetched satellite image for given coordinates.
     
-    **Beispiel-URL:**
+    **Example URL:**
     ```
     /api/v1/satellite-image/51.5074/-0.1278
     ```
     
-    **Response:** PNG-Bild
+    **Response:** PNG image
     
-    **Hinweis:** Bild muss vorher über `/describe-location` abgerufen worden sein.
+    **Note:** The image must first be retrieved via `/describe-location`.
     """
     
     try:
-        # Suche nach Bild im Cache
+        # Look for image in cache
         cache_dir = Path(__file__).parent.parent.parent.parent / "cache" / "satellite_images"
         
-        # Finde neuestes Bild für diese Koordinaten
+        # Find latest image for these coordinates
         pattern = f"satellite_{lat}_{lon}_*.png"
         matching_files = list(cache_dir.glob(pattern))
         
         if not matching_files:
             raise HTTPException(
                 status_code=404,
-                detail=f"Kein Satellitenbild für Koordinaten ({lat}, {lon}) gefunden. Rufe zuerst /describe-location auf."
+                detail=f"No satellite image found for coordinates ({lat}, {lon}). Please call /describe-location first."
             )
         
-        # Nimm neueste Datei
+        # Take the most recent file
         latest_image = max(matching_files, key=lambda p: p.stat().st_mtime)
         
-        logger.info(f"📷 Satellitenbild zurückgegeben: {latest_image.name}")
+        logger.info(f"📷 Returned satellite image: {latest_image.name}")
         
         return FileResponse(
             latest_image,
@@ -248,9 +248,9 @@ async def get_satellite_image(
         raise
     
     except Exception as e:
-        logger.error(f"❌ Fehler beim Abrufen des Satellitenbildes: {e}", exc_info=True)
+        logger.error(f"❌ Error retrieving satellite image: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fehler beim Abrufen des Bildes: {str(e)}"
+            detail=f"Error retrieving image: {str(e)}"
         )
-
+    

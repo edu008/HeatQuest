@@ -1,8 +1,8 @@
 """
-Heatmap-API-Endpunkte mit Smart-Cache.
-Moderne REST-API für Temperatur-Heatmaps basierend auf GPS-Koordinaten.
-Nutzt Landsat-Temperaturdaten und Sentinel-2 NDVI mit optimiertem Batch-Processing.
-Integriert Parent/Child-Grid-System für Community-Cache.
+Heatmap API Endpoints with Smart Cache.
+Modern REST API for temperature heatmaps based on GPS coordinates.
+Uses Landsat temperature data and Sentinel-2 NDVI with optimized batch processing.
+Integrates parent/child grid system for community cache.
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -24,90 +24,90 @@ router = APIRouter(prefix="/api/v1", tags=["heatmap"])
 @router.get(
     "/grid-heat-score-radius",
     response_model=GridHeatScoreResponse,
-    summary="Heat Score Daten um einen Mittelpunkt (JSON)",
-    description="Berechnet Heat Scores mit einem Punkt als Zentrum und Radius - gibt JSON zurück"
+    summary="Heat Score Data around a center point (JSON)",
+    description="Calculates heat scores with a point as center and radius - returns JSON"
 )
 async def get_grid_heat_score_radius(
     lat: float = Query(
         ...,
-        description="Breitengrad (Mittelpunkt)",
+        description="Latitude (center point)",
         ge=-90,
         le=90,
         example=51.5323
     ),
     lon: float = Query(
         ...,
-        description="Längengrad (Mittelpunkt)",
+        description="Longitude (center point)",
         ge=-180,
         le=180,
         example=-0.0531
     ),
     radius_m: Optional[float] = Query(
         500,
-        description="Radius in Metern (Standard: 500m)",
+        description="Radius in meters (default: 500m)",
         gt=0,
         le=2500,
         example=500
     ),
     cell_size_m: Optional[float] = Query(
         30,
-        description="Zellengröße in Metern (Standard: 30m)",
+        description="Cell size in meters (default: 30m)",
         gt=0,
         le=200,
         example=30
     ),
     scene_id: Optional[str] = Query(
         None,
-        description="Landsat-Szenen-ID (OPTIONAL - wird automatisch gesucht!)",
+        description="Landsat scene ID (OPTIONAL - automatically detected!)",
         example="LC09_L2SP_201024_20230721_20230802_02_T1"
     ),
     use_batch: Optional[bool] = Query(
         True,
-        description="Batch-Processing nutzen",
+        description="Use batch processing",
         example=True
     ),
     use_cache: Optional[bool] = Query(
         True,
-        description="🚀 Smart-Cache nutzen (lädt aus DB wenn verfügbar)",
+        description="🚀 Use Smart Cache (loads from DB when available)",
         example=True
     ),
     format: Optional[str] = Query(
         "json",
-        description="Ausgabeformat: 'json' oder 'geojson'",
+        description="Output format: 'json' or 'geojson'",
         example="json"
     )
 ):
     """
-    🎯 **SMART HEATMAP mit Community-Cache!**
+    🎯 **SMART HEATMAP with Community Cache!**
     
-    Lädt Heatmap-Daten intelligent:
-    - ✅ **Nutzt existierende Scans** wenn verfügbar (⚡ 0.5s statt 30s!)
-    - ✅ **Scannt neu** wenn Bereich noch nicht erfasst
-    - ✅ **Community-Feature:** User profitieren voneinander
+    Loads heatmap data intelligently:
+    - ✅ **Uses existing scans** when available (⚡ 0.5s instead of 30s!)
+    - ✅ **Performs new scan** when area not yet covered
+    - ✅ **Community feature:** Users benefit from each other
     
-    **Beispiel-URL:**
+    **Example URL:**
     ```
     /api/v1/grid-heat-score-radius?lat=51.5323&lon=-0.0531&radius_m=500&cell_size_m=30
     ```
     
-    **Wie es funktioniert:**
+    **How it works:**
     
-    1. **User A (09:00)** scannt Bahnhofplatz → Neuer Scan, speichert Parent-Cell + Child-Cells
-    2. **User B (10:00)** scannt gleichen Bereich → Parent-Cell gefunden! Lädt aus DB (⚡ instant!)
-    3. **User C (11:00)** scannt 500m weiter → Neue Parent-Cell, neuer Scan
+    1. **User A (09:00)** scans Station Square → New scan, saves Parent + Child Cells  
+    2. **User B (10:00)** scans same area → Parent Cell found! Loads from DB (⚡ instant!)  
+    3. **User C (11:00)** scans 500m away → New Parent Cell, new scan  
     
-    **Response enthält:**
-    - `grid_cells`: Heat Score Daten
-    - `from_cache`: TRUE wenn aus DB geladen
-    - `parent_cell_info`: Info über Parent-Cell (wer hat schon gescannt, etc.)
-    - `total_scans`: Wie oft wurde dieser Bereich schon gescannt
+    **Response includes:**
+    - `grid_cells`: Heat score data  
+    - `from_cache`: TRUE if loaded from DB  
+    - `parent_cell_info`: Info about Parent Cell (who scanned before, etc.)  
+    - `total_scans`: How many times this area was scanned  
     
-    **Parameter:**
-    - **lat, lon**: Koordinaten (z.B. London: 51.5323, -0.0531)
-    - **radius_m**: Radius in Metern (500m = 1km Durchmesser)
-    - **cell_size_m**: Zellengröße (30m = maximale Auflösung)
-    - **use_cache**: TRUE = Smart-Cache nutzen (empfohlen!), FALSE = immer neu scannen
-    - **scene_id**: Optional - wird automatisch gefunden
+    **Parameters:**
+    - **lat, lon**: Coordinates (e.g., London: 51.5323, -0.0531)
+    - **radius_m**: Radius in meters (500m = 1km diameter)
+    - **cell_size_m**: Cell size (30m = maximum resolution)
+    - **use_cache**: TRUE = Use Smart Cache (recommended!), FALSE = always rescan
+    - **scene_id**: Optional - automatically found
     """
     
     try:
@@ -118,7 +118,7 @@ async def get_grid_heat_score_radius(
         logger.info(f"   Use Cache: {use_cache}")
         logger.info("=" * 70)
         
-        # Berechne Bounding Box aus Radius
+        # Calculate bounding box from radius
         lat_offset = radius_m / 111000
         lon_offset = radius_m / (111000 * math.cos(math.radians(lat)))
         
@@ -127,7 +127,7 @@ async def get_grid_heat_score_radius(
         lon_min = lon - lon_offset
         lon_max = lon + lon_offset
         
-        # Variablen initialisieren
+        # Initialize variables
         from_cache = False
         parent_cell = None
         cell_results = []
@@ -138,21 +138,21 @@ async def get_grid_heat_score_radius(
         # SMART CACHE LOGIC
         # ========================================
         if use_cache:
-            # Schritt 1: Suche existierende Parent-Cell
+            # Step 1: Search existing Parent Cell
             parent_cell = await parent_cell_service.find_existing_parent_cell(lat, lon)
             
             if parent_cell:
-                # ✅ Parent-Cell gefunden! Lade aus DB
-                logger.info("🎉 Parent-Cell gefunden! Lade Child-Cells aus Cache...")
+                # ✅ Parent Cell found! Load from cache
+                logger.info("🎉 Parent Cell found! Loading Child Cells from cache...")
                 from_cache = True
                 
-                # Erhöhe Scan-Counter
+                # Increase scan counter
                 await parent_cell_service.increment_scan_count(parent_cell['id'])
                 
-                # Lade Child-Cells
+                # Load Child Cells
                 child_cells_data = await parent_cell_service.load_child_cells(parent_cell['id'])
                 
-                # Konvertiere zu GridCellResponse
+                # Convert to GridCellResponse
                 cell_results = [
                     GridCellResponse(
                         cell_id=cell['cell_id'],
@@ -171,16 +171,16 @@ async def get_grid_heat_score_radius(
                 landsat_scene_id = parent_cell.get('landsat_scene_id')
                 ndvi_source = parent_cell.get('ndvi_source')
                 
-                logger.info(f"✅ {len(cell_results)} Child-Cells aus Cache geladen!")
-                logger.info(f"⚡ Dieser Bereich wurde bereits {parent_cell['total_scans']}x gescannt")
+                logger.info(f"✅ {len(cell_results)} Child Cells loaded from cache!")
+                logger.info(f"⚡ This area has already been scanned {parent_cell['total_scans']} times")
         
         # ========================================
-        # FALLBACK: Neuer Scan
+        # FALLBACK: New Scan
         # ========================================
         if not cell_results:
-            logger.info("🔍 Kein Cache verfügbar → Starte neuen Scan...")
+            logger.info("🔍 No cache available → Starting new scan...")
             
-            # Generiere Grid
+            # Generate Grid
             grid_cells = grid_service.generate_grid(
                 lat_min=lat_min,
                 lat_max=lat_max,
@@ -189,9 +189,9 @@ async def get_grid_heat_score_radius(
                 cell_size_m=cell_size_m
             )
             
-            logger.info(f"   Grid: {len(grid_cells)} Zellen ({cell_size_m}m × {cell_size_m}m)")
+            logger.info(f"   Grid: {len(grid_cells)} cells ({cell_size_m}m × {cell_size_m}m)")
             
-            # Berechne Heat Scores
+            # Calculate Heat Scores
             if use_batch:
                 cell_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores_batch(
                     grid_cells=grid_cells,
@@ -205,11 +205,11 @@ async def get_grid_heat_score_radius(
                     max_cells=100
                 )
             
-            # Speichere in DB (nur wenn Cache aktiviert)
+            # Save in DB (only if cache is enabled)
             if use_cache:
-                logger.info("💾 Speichere Scan für zukünftige User...")
+                logger.info("💾 Saving scan for future users...")
                 
-                # Erstelle Parent-Cell
+                # Create Parent Cell
                 parent_cell = await parent_cell_service.create_parent_cell(
                     lat=lat,
                     lon=lon,
@@ -217,13 +217,13 @@ async def get_grid_heat_score_radius(
                     ndvi_source=ndvi_source
                 )
                 
-                # Speichere Child-Cells
+                # Save Child Cells
                 await parent_cell_service.save_child_cells(
                     parent_cell_id=parent_cell['id'],
                     grid_cells=cell_results
                 )
                 
-                logger.info("✅ Scan gespeichert! Nächster User kann aus Cache laden.")
+                logger.info("✅ Scan saved! Next user can load from cache.")
         
         # ========================================
         # RESPONSE
@@ -244,7 +244,7 @@ async def get_grid_heat_score_radius(
             ndvi_source=ndvi_source
         )
         
-        # Erweitere Response mit Cache-Info
+        # Add cache info to response
         response_dict = response.dict()
         response_dict['from_cache'] = from_cache
         response_dict['parent_cell_info'] = {
@@ -256,14 +256,14 @@ async def get_grid_heat_score_radius(
         } if parent_cell else None
         
         logger.info("=" * 70)
-        logger.info(f"✅ Response bereit:")
+        logger.info(f"✅ Response ready:")
         logger.info(f"   From Cache: {from_cache}")
         logger.info(f"   Total Cells: {len(cell_results)}")
         if parent_cell:
-            logger.info(f"   Total Scans (dieser Bereich): {parent_cell['total_scans']}")
+            logger.info(f"   Total Scans (this area): {parent_cell['total_scans']}")
         logger.info("=" * 70)
         
-        # Format-Ausgabe
+        # Output format
         if format.lower() == "geojson":
             geojson = grid_service.export_to_geojson(cell_results, bounds)
             return JSONResponse(content=geojson)
@@ -274,94 +274,94 @@ async def get_grid_heat_score_radius(
         raise
     
     except Exception as e:
-        logger.error(f"Fehler bei JSON Heat Score: {e}", exc_info=True)
+        logger.error(f"Error during JSON Heat Score: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fehler bei der Verarbeitung: {str(e)}"
+            detail=f"Error during processing: {str(e)}"
         )
 
 
 @router.get(
     "/grid-heat-score-map-radius",
     response_class=HTMLResponse,
-    summary="Heatmap um einen Mittelpunkt (Visualisierung)",
-    description="Erstellt eine interaktive Heatmap mit Folium - zeigt farbige Grid-Zellen auf Mapbox-Karte"
+    summary="Heatmap around a center point (Visualization)",
+    description="Creates an interactive heatmap with Folium - shows colored grid cells on Mapbox map"
 )
 async def get_grid_heat_score_map_radius(
     lat: float = Query(
         ...,
-        description="Breitengrad (Mittelpunkt)",
+        description="Latitude (center point)",
         ge=-90,
         le=90,
         example=51.5323
     ),
     lon: float = Query(
         ...,
-        description="Längengrad (Mittelpunkt)",
+        description="Longitude (center point)",
         ge=-180,
         le=180,
         example=-0.0531
     ),
     radius_m: Optional[float] = Query(
         500,
-        description="Radius in Metern (Standard: 500m)",
+        description="Radius in meters (default: 500m)",
         gt=0,
         le=2500,
         example=500
     ),
     cell_size_m: Optional[float] = Query(
         30,
-        description="Zellengröße in Metern (Standard: 30m für maximale Auflösung)",
+        description="Cell size in meters (default: 30m for maximum resolution)",
         gt=0,
         le=200,
         example=30
     ),
     scene_id: Optional[str] = Query(
         None,
-        description="Landsat-Szenen-ID (OPTIONAL - wird automatisch gesucht!)",
+        description="Landsat scene ID (OPTIONAL - automatically detected!)",
         example="LC09_L2SP_201024_20230721_20230802_02_T1"
     ),
     use_batch: Optional[bool] = Query(
         True,
-        description="Batch-Processing nutzen",
+        description="Use batch processing",
         example=True
     )
 ):
     """
-    🗺️ **INTERAKTIVE HEATMAP-VISUALISIERUNG!**
+    🗺️ **INTERACTIVE HEATMAP VISUALIZATION!**
     
-    Erstellt eine schöne interaktive Karte mit Folium (nutzt deinen Mapbox-Token).
+    Creates a beautiful interactive map with Folium (uses your Mapbox token).
     
-    **Beispiel-URL:**
+    **Example URL:**
     ```
     /api/v1/grid-heat-score-map-radius?lat=51.5323&lon=-0.0531&radius_m=500&cell_size_m=30
     ```
     
     **Features:**
-    - 🎨 Farbskala: Gelb (kühl) → Orange → Rot (heiß)
-    - 🔍 Hover-Tooltips mit Details (Temp, NDVI, Heat Score)
-    - 📱 Fullscreen-Modus
-    - 🗺️ Mapbox-Basemap (nutzt .env MAP Token)
+    - 🎨 Color scale: Yellow (cool) → Orange → Red (hot)
+    - 🔍 Hover tooltips with details (Temp, NDVI, Heat Score)
+    - 📱 Fullscreen mode
+    - 🗺️ Mapbox basemap (uses .env MAP token)
     
     **Workflow:**
-    1. Erstellt Grid um deinen Mittelpunkt
-    2. Berechnet Heat Scores mit Batch-Processing (10-15x schneller!)
-    3. Visualisiert als farbige Polygone auf Karte
-    4. Gibt HTML zurück → Öffne direkt im Browser!
+    1. Creates grid around your center point
+    2. Calculates heat scores with batch processing (10–15× faster!)
+    3. Visualizes as colored polygons on the map
+    4. Returns HTML → Open directly in browser!
     
-    **Parameter:**
-    - **lat, lon**: Koordinaten (z.B. London: 51.5323, -0.0531)
-    - **radius_m**: Radius in Metern (500m = 1km Durchmesser)
-    - **cell_size_m**: Zellengröße (30m = maximale Auflösung, Landsat-Pixel-Größe)
-    - **scene_id**: Optional - wird automatisch gefunden für London, Berlin, Paris, New York
+    **Parameters:**
+    - **lat, lon**: Coordinates (e.g., London: 51.5323, -0.0531)
+    - **radius_m**: Radius in meters (500m = 1km diameter)
+    - **cell_size_m**: Cell size (30m = maximum resolution, Landsat pixel size)
+    - **scene_id**: Optional - automatically found for London, Berlin, Paris, New York
     
-    **Öffne die URL direkt im Browser für die interaktive Karte!** 🌍
+    **Open the URL directly in your browser for the interactive map!** 🌍
     """
     
     try:
-        logger.info(f"🗺️  Radius-Heatmap: Zentrum=({lat},{lon}), Radius={radius_m}m, Zellen={cell_size_m}m")
+        logger.info(f"🗺️  Radius Heatmap: Center=({lat},{lon}), Radius={radius_m}m, Cells={cell_size_m}m")
         
-        # Berechne Bounding Box aus Mittelpunkt + Radius
+        # Calculate bounding box from center + radius
         lat_offset = radius_m / 111000
         lon_offset = radius_m / (111000 * math.cos(math.radians(lat)))
         
@@ -370,10 +370,10 @@ async def get_grid_heat_score_map_radius(
         lon_min = lon - lon_offset
         lon_max = lon + lon_offset
         
-        logger.info(f"   Berechnete Bounding Box: ({lat_min:.6f},{lon_min:.6f}) bis ({lat_max:.6f},{lon_max:.6f})")
-        logger.info(f"   Gebietsgröße: ~{radius_m*2}m × ~{radius_m*2}m")
+        logger.info(f"   Calculated Bounding Box: ({lat_min:.6f},{lon_min:.6f}) to ({lat_max:.6f},{lon_max:.6f})")
+        logger.info(f"   Area size: ~{radius_m*2}m × ~{radius_m*2}m")
         
-        # Generiere Grid
+        # Generate grid
         grid_cells = grid_service.generate_grid(
             lat_min=lat_min,
             lat_max=lat_max,
@@ -382,13 +382,13 @@ async def get_grid_heat_score_map_radius(
             cell_size_m=cell_size_m
         )
         
-        logger.info(f"   Grid erstellt: {len(grid_cells)} Zellen ({cell_size_m}m × {cell_size_m}m)")
+        logger.info(f"   Grid created: {len(grid_cells)} cells ({cell_size_m}m × {cell_size_m}m)")
         
-        # Schätze Verarbeitungszeit
-        estimated_time = len(grid_cells) * 0.015  # ~15ms pro Zelle mit Batch
-        logger.info(f"   ⏱️  Geschätzte Zeit: ~{estimated_time:.1f}s")
+        # Estimate processing time
+        estimated_time = len(grid_cells) * 0.015  # ~15ms per cell with batch
+        logger.info(f"   ⏱️  Estimated time: ~{estimated_time:.1f}s")
         
-        # Berechne Heat Scores mit Batch-Processing
+        # Calculate heat scores with batch processing
         if use_batch:
             cell_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores_batch(
                 grid_cells=grid_cells,
@@ -402,7 +402,7 @@ async def get_grid_heat_score_map_radius(
                 max_cells=100
             )
         
-        # Erstelle Heatmap-Visualisierung
+        # Create heatmap visualization
         bounds = {
             "lat_min": lat_min,
             "lat_max": lat_max,
@@ -410,10 +410,10 @@ async def get_grid_heat_score_map_radius(
             "lon_max": lon_max
         }
         
-        logger.info("Erstelle Heatmap-Visualisierung...")
+        logger.info("Creating heatmap visualization...")
         html_map = visualization_service.create_heatmap(cell_results, bounds)
         
-        logger.info("✅ Heatmap-Visualisierung abgeschlossen!")
+        logger.info("✅ Heatmap visualization complete!")
         
         return HTMLResponse(content=html_map)
     
@@ -421,24 +421,24 @@ async def get_grid_heat_score_map_radius(
         raise
     
     except Exception as e:
-        logger.error(f"Fehler bei Radius-Heatmap: {e}", exc_info=True)
+        logger.error(f"Error during Radius Heatmap: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fehler bei der Verarbeitung: {str(e)}"
+            detail=f"Error during processing: {str(e)}"
         )
 
 
 @router.get(
     "/health",
     summary="Health Check",
-    description="Prüft, ob die API verfügbar ist"
+    description="Checks if the API is available"
 )
 async def health_check():
     """
-    Einfacher Health-Check-Endpoint.
+    Simple health check endpoint.
     
     Returns:
-        Status-Information über die API
+        Status information about the API
     """
     return {
         "status": "healthy",

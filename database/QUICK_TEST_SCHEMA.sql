@@ -1,9 +1,9 @@
 -- ============================================
--- QUICK TEST SCHEMA - Nur die wichtigsten Tabellen
--- Zum schnellen Testen der Parent/Child-Logik
+-- QUICK TEST SCHEMA - Only the most important tables
+-- For quick testing of Parent/Child logic
 -- ============================================
 
--- 1. Parent-Cells (Große Bereiche ~1km)
+-- 1. Parent-Cells (Large areas ~1km)
 CREATE TABLE IF NOT EXISTS public.parent_cells (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     cell_key TEXT UNIQUE NOT NULL,
@@ -27,25 +27,25 @@ CREATE TABLE IF NOT EXISTS public.parent_cells (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Index für schnelle Suche
+-- Index for fast search
 CREATE INDEX IF NOT EXISTS parent_cells_cell_key_idx ON public.parent_cells(cell_key);
 
 -- RLS
 ALTER TABLE public.parent_cells ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Parent-Cells sind öffentlich lesbar"
+CREATE POLICY IF NOT EXISTS "Parent-Cells are publicly readable"
     ON public.parent_cells FOR SELECT
     USING (true);
 
-CREATE POLICY IF NOT EXISTS "System kann Parent-Cells erstellen"
+CREATE POLICY IF NOT EXISTS "System can create Parent-Cells"
     ON public.parent_cells FOR INSERT
     WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "System kann Parent-Cells aktualisieren"
+CREATE POLICY IF NOT EXISTS "System can update Parent-Cells"
     ON public.parent_cells FOR UPDATE
     USING (true);
 
--- 2. Child-Cells (Kleine Zellen 30-200m)
+-- 2. Child-Cells (Small cells 30-200m)
 CREATE TABLE IF NOT EXISTS public.child_cells (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     parent_cell_id UUID REFERENCES public.parent_cells(id) ON DELETE CASCADE NOT NULL,
@@ -73,11 +73,11 @@ CREATE INDEX IF NOT EXISTS child_cells_hotspot_idx ON public.child_cells(is_hots
 -- RLS
 ALTER TABLE public.child_cells ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Child-Cells sind öffentlich lesbar"
+CREATE POLICY IF NOT EXISTS "Child-Cells are publicly readable"
     ON public.child_cells FOR SELECT
     USING (true);
 
-CREATE POLICY IF NOT EXISTS "System kann Child-Cells erstellen"
+CREATE POLICY IF NOT EXISTS "System can create Child-Cells"
     ON public.child_cells FOR INSERT
     WITH CHECK (true);
 
@@ -135,8 +135,8 @@ CREATE TRIGGER child_cells_insert_trigger
 -- SUCCESS!
 DO $$
 BEGIN
-    RAISE NOTICE '✅ Quick Test Schema erfolgreich erstellt!';
-    RAISE NOTICE '📊 Tabellen: parent_cells, child_cells';
-    RAISE NOTICE '🧪 Bereit zum Testen!';
+    RAISE NOTICE '✅ Quick Test Schema successfully created!';
+    RAISE NOTICE '📊 Tables: parent_cells, child_cells';
+    RAISE NOTICE '🧪 Ready for testing!';
 END $$;
 

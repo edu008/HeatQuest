@@ -1,6 +1,6 @@
 """
-Geometrische Operationen für räumliche Berechnungen.
-Erstellt Buffer um GPS-Koordinaten und verwaltet Projektionsumwandlungen.
+Geometric operations for spatial calculations.
+Creates buffers around GPS coordinates and manages projection transformations.
 """
 
 from shapely.geometry import Point
@@ -11,34 +11,34 @@ from typing import Tuple
 
 def create_buffer_around_point(lat: float, lon: float, radius_meters: float = 200) -> Tuple[Point, any]:
     """
-    Erstellt einen Buffer (Kreis) um einen GPS-Punkt.
+    Creates a buffer (circle) around a GPS point.
     
     Args:
-        lat: Breitengrad (WGS84)
-        lon: Längengrad (WGS84)
-        radius_meters: Radius in Metern (Standard: 200m)
+        lat: Latitude (WGS84)
+        lon: Longitude (WGS84)
+        radius_meters: Radius in meters (default: 200m)
     
     Returns:
-        Tuple aus (Mittelpunkt, Buffer-Geometrie in WGS84)
+        Tuple of (center point, buffer geometry in WGS84)
     """
     
-    # Erstelle Punkt in WGS84 (EPSG:4326)
+    # Create point in WGS84 (EPSG:4326)
     point_wgs84 = Point(lon, lat)
     
-    # Transformiere in metrisches Koordinatensystem (Web Mercator EPSG:3857)
-    # für genaue Distanzberechnung
+    # Transform to metric coordinate system (Web Mercator EPSG:3857)
+    # for accurate distance calculations
     transformer_to_metric = Transformer.from_crs(
         CRS.from_epsg(4326),  # WGS84 (lat/lon)
-        CRS.from_epsg(3857),  # Web Mercator (metrisch)
+        CRS.from_epsg(3857),  # Web Mercator (metric)
         always_xy=True
     )
     
     point_metric = transform(transformer_to_metric.transform, point_wgs84)
     
-    # Erstelle Buffer in Metern
+    # Create buffer in meters
     buffer_metric = point_metric.buffer(radius_meters)
     
-    # Transformiere Buffer zurück nach WGS84
+    # Transform buffer back to WGS84
     transformer_to_wgs84 = Transformer.from_crs(
         CRS.from_epsg(3857),  # Web Mercator
         CRS.from_epsg(4326),  # WGS84
@@ -52,10 +52,10 @@ def create_buffer_around_point(lat: float, lon: float, radius_meters: float = 20
 
 def get_buffer_bounds(buffer_geom) -> Tuple[float, float, float, float]:
     """
-    Ermittelt die Bounding Box (min_lon, min_lat, max_lon, max_lat) eines Buffers.
+    Determines the bounding box (min_lon, min_lat, max_lon, max_lat) of a buffer.
     
     Args:
-        buffer_geom: Shapely-Geometrie (Polygon)
+        buffer_geom: Shapely geometry (Polygon)
     
     Returns:
         Tuple: (min_lon, min_lat, max_lon, max_lat)

@@ -1,66 +1,66 @@
 -- ============================================
--- HeatQuest Datenbank-Schema mit Parent/Child-Grid-System
+-- HeatQuest Database Schema with Parent/Child Grid System
 -- ============================================
 -- 
--- Konzept:
--- 1. Parent-Cells = Große Bereiche (z.B. 1km × 1km)
---    → Schnelles Check: "Wurde dieser Bereich schon gescannt?"
--- 2. Child-Cells = Kleine Zellen (30m-200m)
---    → Detaillierte Temperatur/NDVI/Heat Score Daten
--- 3. Wenn User Position öffnet:
---    → Check ob Parent-Cell existiert
---    → Falls JA: Lade Child-Cells (bereits gescannt!)
---    → Falls NEIN: Erstelle Parent-Cell + Child-Cells (neuer Scan)
+-- Concept:
+-- 1. Parent-Cells = Large areas (e.g., 1km × 1km)
+--    → Quick Check: "Has this area been scanned already?"
+-- 2. Child-Cells = Small cells (30m-200m)
+--    → Detailed Temperature/NDVI/Heat Score data
+-- 3. When User opens position:
+--    → Check if Parent-Cell exists
+--    → If YES: Load Child-Cells (already scanned!)
+--    → If NO: Create Parent-Cell + Child-Cells (new scan)
 --
 -- ============================================
 
 -- ============================================
--- 1. profiles (bereits vorhanden)
+-- 1. profiles (already exists)
 -- ============================================
--- (siehe supabase_schema.sql - keine Änderungen)
+-- (see supabase_schema.sql - no changes)
 
 -- ============================================
--- 2. parent_cells (NEU)
--- Große Rasterzellen für schnelle Bereichsprüfung
+-- 2. parent_cells (NEW)
+-- Large grid cells for quick area checking
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.parent_cells (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     
-    -- Identifikation
-    cell_key TEXT UNIQUE NOT NULL,  -- z.B. "parent_51.53_-0.05" (gerundet auf 2 Dezimalstellen = ~1km)
+    -- Identification
+    cell_key TEXT UNIQUE NOT NULL,  -- e.g., "parent_51.53_-0.05" (rounded to 2 decimal places = ~1km)
     
-    -- Zentrum der Parent-Cell
+    -- Center of Parent-Cell
     center_lat DOUBLE PRECISION NOT NULL,
     center_lon DOUBLE PRECISION NOT NULL,
     
-    -- Bounding Box (ca. 1km × 1km Bereich)
+    -- Bounding Box (approx. 1km × 1km area)
     bbox_min_lat DOUBLE PRECISION NOT NULL,
     bbox_min_lon DOUBLE PRECISION NOT NULL,
     bbox_max_lat DOUBLE PRECISION NOT NULL,
     bbox_max_lon DOUBLE PRECISION NOT NULL,
     
-    -- Metadaten
+    -- Metadata
     child_cells_count INTEGER DEFAULT 0,
-    total_scans INTEGER DEFAULT 0,  -- Wie oft wurde dieser Bereich analysiert
+    total_scans INTEGER DEFAULT 0,  -- How often this area was analyzed
     last_scanned_at TIMESTAMP WITH TIME ZONE,
     
-    -- Satellitendaten-Info (wiederverwendbar!)
+    -- Satellite data info (reusable!)
     landsat_scene_id TEXT,
     sentinel_scene_id TEXT,
     ndvi_source TEXT,
     
-    -- Aggregierte Statistiken
+    -- Aggregated Statistics
     avg_temperature DOUBLE PRECISION,
     avg_ndvi DOUBLE PRECISION,
     avg_heat_score DOUBLE PRECISION,
-    hotspot_percentage FLOAT,  -- % der Child-Cells die Hotspots sind
+    hotspot_percentage FLOAT,  -- % of Child-Cells that are hotspots
     
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Indexes für schnelle Geo-Suche
+-- Indexes for fast geo-search
 CREATE INDEX parent_cells_cell_key_idx ON public.parent_cells(cell_key);
 CREATE INDEX parent_cells_center_idx ON public.parent_cells(center_lat, center_lon);
 CREATE INDEX parent_cells_bbox_idx ON public.parent_cells USING GIST (
@@ -74,26 +74,26 @@ CREATE INDEX parent_cells_last_scanned_idx ON public.parent_cells(last_scanned_a
 -- RLS
 ALTER TABLE public.parent_cells ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Parent-Cells sind öffentlich lesbar"
+CREATE POLICY "Parent-Cells are publicly readable"
     ON public.parent_cells FOR SELECT
     USING (true);
 
-CREATE POLICY "Nur System kann Parent-Cells erstellen"
+CREATE POLICY "Only System can create Parent-Cells"
     ON public.parent_cells FOR INSERT
     WITH CHECK (true);  -- Backend erstellt diese
 
 -- ============================================
--- 3. child_cells (NEU)
--- Kleine Rasterzellen mit detaillierten Daten
+-- 3. child_cells (NEW)
+-- Small grid cells with detailed data
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.child_cells (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     
-    -- Zuordnung zur Parent-Cell
+    -- Assignment to Parent-Cell
     parent_cell_id UUID REFERENCES public.parent_cells(id) ON DELETE CASCADE NOT NULL,
     
     -- Identifikation
-    cell_id TEXT NOT NULL,  -- z.B. "cell_142_312"
+    cell_id TEXT NOT NULL,  -- e.g., "cell_142_312"
     
     -- Position
     center_lat DOUBLE PRECISION NOT NULL,
@@ -105,9 +105,9 @@ CREATE TABLE IF NOT EXISTS public.child_cells (
     lon_min DOUBLE PRECISION NOT NULL,
     lon_max DOUBLE PRECISION NOT NULL,
     
-    -- Satellitendaten
+    -- Satellite data
     temperature DOUBLE PRECISION,  -- Celsius
-    ndvi DOUBLE PRECISION,  -- -1 bis 1
+    ndvi DOUBLE PRECISION,  -- -1 to 1
     heat_score DOUBLE PRECISION,  -- temp - (0.3 * ndvi)
     
     -- Metadaten
@@ -132,23 +132,23 @@ CREATE INDEX child_cells_hotspot_idx ON public.child_cells(is_hotspot) WHERE is_
 CREATE INDEX child_cells_heat_score_idx ON public.child_cells(heat_score DESC);
 CREATE INDEX child_cells_center_idx ON public.child_cells(center_lat, center_lon);
 
--- Unique Constraint: Jede cell_id nur einmal pro Parent
+-- Unique Constraint: Each cell_id only once per Parent
 CREATE UNIQUE INDEX child_cells_unique_idx ON public.child_cells(parent_cell_id, cell_id);
 
 -- RLS
 ALTER TABLE public.child_cells ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Child-Cells sind öffentlich lesbar"
+CREATE POLICY "Child-Cells are publicly readable"
     ON public.child_cells FOR SELECT
     USING (true);
 
-CREATE POLICY "Nur System kann Child-Cells erstellen"
+CREATE POLICY "Only System can create Child-Cells"
     ON public.child_cells FOR INSERT
     WITH CHECK (true);
 
 -- ============================================
 -- 4. cell_analyses
--- AI-Beschreibungen für Hotspot-Zellen
+-- AI descriptions for hotspot cells
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.cell_analyses (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -157,20 +157,20 @@ CREATE TABLE IF NOT EXISTS public.cell_analyses (
     child_cell_id UUID REFERENCES public.child_cells(id) ON DELETE CASCADE NOT NULL,
     parent_cell_id UUID REFERENCES public.parent_cells(id) ON DELETE CASCADE NOT NULL,
     
-    -- Position (denormalisiert für Performance)
+    -- Position (denormalized for performance)
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
     
-    -- Satellitendaten (denormalisiert)
+    -- Satellite data (denormalized)
     temperature DOUBLE PRECISION,
     ndvi DOUBLE PRECISION,
     heat_score DOUBLE PRECISION,
     
     -- AI-Analyse (Gemini/Vertex AI)
-    ai_summary TEXT,  -- Kurzbeschreibung
-    main_cause TEXT,  -- Hauptursache (Asphalt, fehlende Bäume, etc.)
-    suggested_actions JSONB,  -- Liste von Maßnahmen
-    confidence FLOAT DEFAULT 0.0,  -- KI-Konfidenz
+    ai_summary TEXT,  -- Brief description
+    main_cause TEXT,  -- Main cause (asphalt, missing trees, etc.)
+    suggested_actions JSONB,  -- List of measures
+    confidence FLOAT DEFAULT 0.0,  -- AI confidence
     
     -- Metadaten
     image_url TEXT,  -- Mapbox Satellitenbild
@@ -187,11 +187,11 @@ CREATE INDEX cell_analyses_created_idx ON public.cell_analyses(created_at DESC);
 -- RLS
 ALTER TABLE public.cell_analyses ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Cell-Analysen sind öffentlich lesbar"
+CREATE POLICY "Cell-Analyses are publicly readable"
     ON public.cell_analyses FOR SELECT
     USING (true);
 
-CREATE POLICY "Nur System kann Analysen erstellen"
+CREATE POLICY "Only System can create analyses"
     ON public.cell_analyses FOR INSERT
     WITH CHECK (true);
 
@@ -241,15 +241,15 @@ CREATE INDEX discoveries_created_idx ON public.discoveries(created_at DESC);
 -- RLS
 ALTER TABLE public.discoveries ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Discoveries sind öffentlich lesbar"
+CREATE POLICY "Discoveries are publicly readable"
     ON public.discoveries FOR SELECT
     USING (true);
 
-CREATE POLICY "User können eigene Discoveries erstellen"
+CREATE POLICY "Users can create their own discoveries"
     ON public.discoveries FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "User können eigene Discoveries löschen"
+CREATE POLICY "Users can delete their own discoveries"
     ON public.discoveries FOR DELETE
     USING (auth.uid() = user_id);
 
@@ -302,19 +302,19 @@ CREATE INDEX missions_created_idx ON public.missions(created_at DESC);
 -- RLS
 ALTER TABLE public.missions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Missions sind öffentlich lesbar"
+CREATE POLICY "Missions are publicly readable"
     ON public.missions FOR SELECT
     USING (true);
 
-CREATE POLICY "User können eigene Missions sehen"
+CREATE POLICY "Users can view their own missions"
     ON public.missions FOR SELECT
     USING (auth.uid() = user_id);
 
-CREATE POLICY "User können eigene Missions erstellen"
+CREATE POLICY "Users can create their own missions"
     ON public.missions FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "User können eigene Missions aktualisieren"
+CREATE POLICY "Users can update their own missions"
     ON public.missions FOR UPDATE
     USING (auth.uid() = user_id);
 
@@ -331,7 +331,7 @@ CREATE TABLE IF NOT EXISTS public.user_locations (
     -- Position
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
-    accuracy FLOAT,  -- GPS-Genauigkeit in Metern
+    accuracy FLOAT,  -- GPS accuracy in meters
     
     -- Kontext
     context TEXT CHECK (context IN ('exploring', 'mission', 'analyzing')),
@@ -349,11 +349,11 @@ CREATE INDEX user_locations_time_idx ON public.user_locations(recorded_at DESC);
 -- RLS
 ALTER TABLE public.user_locations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "User können eigene Locations sehen"
+CREATE POLICY "Users can view their own locations"
     ON public.user_locations FOR SELECT
     USING (auth.uid() = user_id);
 
-CREATE POLICY "User können eigene Locations erstellen"
+CREATE POLICY "Users can create their own locations"
     ON public.user_locations FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
@@ -361,7 +361,7 @@ CREATE POLICY "User können eigene Locations erstellen"
 -- HELPER FUNCTIONS
 -- ============================================
 
--- Funktion: Finde Parent-Cell für GPS-Position
+-- Function: Find Parent-Cell for GPS position
 CREATE OR REPLACE FUNCTION find_parent_cell_for_position(
     lat DOUBLE PRECISION,
     lon DOUBLE PRECISION,
@@ -382,7 +382,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Funktion: Erstelle Parent-Cell-Key
+-- Function: Create Parent-Cell-Key
 CREATE OR REPLACE FUNCTION create_parent_cell_key(
     lat DOUBLE PRECISION,
     lon DOUBLE PRECISION,
@@ -395,7 +395,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Funktion: Update Parent-Cell Statistiken
+-- Function: Update Parent-Cell Statistics
 CREATE OR REPLACE FUNCTION update_parent_cell_stats(parent_id UUID)
 RETURNS VOID AS $$
 BEGIN
@@ -435,7 +435,7 @@ $$ LANGUAGE plpgsql;
 -- TRIGGERS
 -- ============================================
 
--- Trigger: Auto-Update Parent-Cell Stats wenn Child-Cells hinzugefügt werden
+-- Trigger: Auto-Update Parent-Cell Stats when Child-Cells are added
 CREATE OR REPLACE FUNCTION trigger_update_parent_stats()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -461,7 +461,7 @@ CREATE TRIGGER child_cells_update_trigger
 -- VIEWS
 -- ============================================
 
--- View: Übersicht aller gescannten Bereiche
+-- View: Overview of all scanned areas
 CREATE OR REPLACE VIEW public.scanned_areas AS
 SELECT 
     p.id,
@@ -480,7 +480,7 @@ FROM public.parent_cells p
 LEFT JOIN public.discoveries d ON d.parent_cell_id = p.id
 GROUP BY p.id;
 
--- View: Leaderboard erweitert
+-- View: Extended Leaderboard
 CREATE OR REPLACE VIEW public.leaderboard_extended AS
 SELECT 
     p.id,
@@ -503,21 +503,21 @@ LIMIT 100;
 -- ============================================
 DO $$
 BEGIN
-    RAISE NOTICE '✅ HeatQuest Parent/Child-Grid-Schema erfolgreich erstellt!';
+    RAISE NOTICE '✅ HeatQuest Parent/Child Grid Schema successfully created!';
     RAISE NOTICE '';
-    RAISE NOTICE '📊 Tabellen:';
-    RAISE NOTICE '  - parent_cells (große Bereiche ~1km)';
-    RAISE NOTICE '  - child_cells (kleine Zellen 30-200m)';
-    RAISE NOTICE '  - cell_analyses (AI-Beschreibungen)';
-    RAISE NOTICE '  - discoveries (User-Entdeckungen)';
-    RAISE NOTICE '  - missions (Aufgaben)';
-    RAISE NOTICE '  - user_locations (GPS-Tracking)';
+    RAISE NOTICE '📊 Tables:';
+    RAISE NOTICE '  - parent_cells (large areas ~1km)';
+    RAISE NOTICE '  - child_cells (small cells 30-200m)';
+    RAISE NOTICE '  - cell_analyses (AI descriptions)';
+    RAISE NOTICE '  - discoveries (user discoveries)';
+    RAISE NOTICE '  - missions (tasks)';
+    RAISE NOTICE '  - user_locations (GPS tracking)';
     RAISE NOTICE '';
-    RAISE NOTICE '🔧 Helper-Funktionen:';
+    RAISE NOTICE '🔧 Helper Functions:';
     RAISE NOTICE '  - find_parent_cell_for_position(lat, lon)';
     RAISE NOTICE '  - create_parent_cell_key(lat, lon)';
     RAISE NOTICE '  - update_parent_cell_stats(parent_id)';
     RAISE NOTICE '';
-    RAISE NOTICE '🚀 Bereit für HeatQuest mit Community-Features!';
+    RAISE NOTICE '🚀 Ready for HeatQuest with Community Features!';
 END $$;
 

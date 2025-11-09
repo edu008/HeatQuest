@@ -1,6 +1,6 @@
 """
-Pydantic-Modelle für die Heatmap-API.
-Definiert Request- und Response-Schemas.
+Pydantic models for the Heatmap API.
+Defines request and response schemas.
 """
 
 from pydantic import BaseModel, Field
@@ -9,11 +9,11 @@ from typing import Optional
 
 class HeatmapRequest(BaseModel):
     """
-    Request-Schema für Heatmap-Abfragen.
+    Request schema for heatmap queries.
     """
-    lat: float = Field(..., description="Breitengrad (WGS84)", ge=-90, le=90)
-    lon: float = Field(..., description="Längengrad (WGS84)", ge=-180, le=180)
-    radius: Optional[float] = Field(200, description="Radius in Metern", gt=0)
+    lat: float = Field(..., description="Latitude (WGS84)", ge=-90, le=90)
+    lon: float = Field(..., description="Longitude (WGS84)", ge=-180, le=180)
+    radius: Optional[float] = Field(200, description="Radius in meters", gt=0)
     
     class Config:
         json_schema_extra = {
@@ -27,14 +27,14 @@ class HeatmapRequest(BaseModel):
 
 class HeatmapResponse(BaseModel):
     """
-    Response-Schema mit berechneten Temperaturwerten.
+    Response schema with calculated temperature values.
     """
-    mean_temp: float = Field(..., description="Durchschnittstemperatur in °C")
-    min_temp: float = Field(..., description="Minimale Temperatur in °C")
-    max_temp: float = Field(..., description="Maximale Temperatur in °C")
-    unit: str = Field(default="°C", description="Temperatureinheit")
-    scene_id: str = Field(..., description="ID der verwendeten Landsat-Szene")
-    pixel_count: int = Field(..., description="Anzahl der ausgewerteten Pixel")
+    mean_temp: float = Field(..., description="Average temperature in °C")
+    min_temp: float = Field(..., description="Minimum temperature in °C")
+    max_temp: float = Field(..., description="Maximum temperature in °C")
+    unit: str = Field(default="°C", description="Temperature unit")
+    scene_id: str = Field(..., description="ID of the used Landsat scene")
+    pixel_count: int = Field(..., description="Number of evaluated pixels")
     
     class Config:
         json_schema_extra = {
@@ -51,15 +51,15 @@ class HeatmapResponse(BaseModel):
 
 class HeatScoreResponse(BaseModel):
     """
-    Response-Schema mit Heat Score (Temperatur + NDVI).
+    Response schema with Heat Score (Temperature + NDVI).
     """
-    temp: float = Field(..., description="Durchschnittstemperatur in °C")
-    ndvi: float = Field(..., description="NDVI-Wert (Normalized Difference Vegetation Index)")
+    temp: float = Field(..., description="Average temperature in °C")
+    ndvi: float = Field(..., description="NDVI value (Normalized Difference Vegetation Index)")
     heat_score: float = Field(..., description="Heat Score = temp - (0.3 * ndvi)")
-    unit: str = Field(default="°C", description="Temperatureinheit")
-    scene_id: str = Field(..., description="ID der verwendeten Landsat-Szene")
-    pixel_count: int = Field(..., description="Anzahl der ausgewerteten Pixel")
-    ndvi_source: Optional[str] = Field(None, description="Quelle der NDVI-Daten")
+    unit: str = Field(default="°C", description="Temperature unit")
+    scene_id: str = Field(..., description="ID of the used Landsat scene")
+    pixel_count: int = Field(..., description="Number of evaluated pixels")
+    ndvi_source: Optional[str] = Field(None, description="Source of NDVI data")
     
     class Config:
         json_schema_extra = {
@@ -77,37 +77,37 @@ class HeatScoreResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """
-    Fehler-Response-Schema.
+    Error response schema.
     """
-    error: str = Field(..., description="Fehlermeldung")
-    details: Optional[str] = Field(None, description="Detaillierte Fehlerinformationen")
+    error: str = Field(..., description="Error message")
+    details: Optional[str] = Field(None, description="Detailed error information")
 
 
 class GridCellResponse(BaseModel):
     """
-    Response-Schema für eine einzelne Grid-Zelle.
+    Response schema for a single grid cell.
     """
-    cell_id: str = Field(..., description="Zellen-ID (z.B. 'cell_0_0')")
-    lat_min: float = Field(..., description="Minimaler Breitengrad")
-    lat_max: float = Field(..., description="Maximaler Breitengrad")
-    lon_min: float = Field(..., description="Minimaler Längengrad")
-    lon_max: float = Field(..., description="Maximaler Längengrad")
-    temp: Optional[float] = Field(None, description="Durchschnittstemperatur in °C")
-    ndvi: Optional[float] = Field(None, description="Durchschnittlicher NDVI")
+    cell_id: str = Field(..., description="Cell ID (e.g. 'cell_0_0')")
+    lat_min: float = Field(..., description="Minimum latitude")
+    lat_max: float = Field(..., description="Maximum latitude")
+    lon_min: float = Field(..., description="Minimum longitude")
+    lon_max: float = Field(..., description="Maximum longitude")
+    temp: Optional[float] = Field(None, description="Average temperature in °C")
+    ndvi: Optional[float] = Field(None, description="Average NDVI")
     heat_score: Optional[float] = Field(None, description="Heat Score = temp - (0.3 * ndvi)")
-    pixel_count: Optional[int] = Field(None, description="Anzahl gültiger Pixel")
+    pixel_count: Optional[int] = Field(None, description="Number of valid pixels")
 
 
 class GridHeatScoreResponse(BaseModel):
     """
-    Response-Schema für Grid-basierte Heat Score Berechnung.
+    Response schema for grid-based heat score calculation.
     """
-    grid_cells: list[GridCellResponse] = Field(..., description="Liste aller Grid-Zellen mit Heat Scores")
-    total_cells: int = Field(..., description="Anzahl der Grid-Zellen")
-    cell_size_m: float = Field(200, description="Zellengröße in Metern")
-    bounds: dict = Field(..., description="Bounding Box (lat_min, lat_max, lon_min, lon_max)")
-    scene_id: str = Field(..., description="ID der verwendeten Landsat-Szene")
-    ndvi_source: str = Field(..., description="Quelle der NDVI-Daten")
+    grid_cells: list[GridCellResponse] = Field(..., description="List of all grid cells with heat scores")
+    total_cells: int = Field(..., description="Number of grid cells")
+    cell_size_m: float = Field(200, description="Cell size in meters")
+    bounds: dict = Field(..., description="Bounding box (lat_min, lat_max, lon_min, lon_max)")
+    scene_id: str = Field(..., description="ID of the used Landsat scene")
+    ndvi_source: str = Field(..., description="Source of NDVI data")
     
     class Config:
         json_schema_extra = {
@@ -137,4 +137,4 @@ class GridHeatScoreResponse(BaseModel):
                 "ndvi_source": "sentinel-2"
             }
         }
-
+        

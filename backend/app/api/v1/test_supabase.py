@@ -1,5 +1,5 @@
 """
-Test-Endpoint für Supabase-Verbindung
+Test endpoint for Supabase connection
 """
 from fastapi import APIRouter, HTTPException
 import logging
@@ -13,101 +13,101 @@ router = APIRouter(prefix="/api/v1", tags=["test"])
 
 @router.get(
     "/test-supabase",
-    summary="🧪 Test Supabase Verbindung",
-    description="Prüft ob Supabase-Verbindung funktioniert"
+    summary="🧪 Test Supabase Connection",
+    description="Checks whether the Supabase connection is working"
 )
 async def test_supabase_connection():
     """
-    Testet die Verbindung zu Supabase.
+    Tests the connection to Supabase.
     
-    **Prüft:**
-    1. Supabase Client initialisiert?
-    2. Kann auf profiles-Tabelle zugreifen?
-    3. Kann auf parent_cells-Tabelle zugreifen?
+    **Checks:**
+    1. Is the Supabase client initialized?
+    2. Can it access the profiles table?
+    3. Can it access the parent_cells table?
     
     Returns:
-        Status-Information über Supabase-Verbindung
+        Status information about the Supabase connection
     """
     try:
-        logger.info("🧪 Teste Supabase-Verbindung...")
+        logger.info("🧪 Testing Supabase connection...")
         
         results = {
             "status": "testing",
             "tests": {}
         }
         
-        # Test 1: Client vorhanden?
+        # Test 1: Is client initialized?
         try:
             if supabase_service.client:
                 results["tests"]["client_initialized"] = {
                     "status": "✅ OK",
-                    "message": "Supabase Client erfolgreich initialisiert"
+                    "message": "Supabase client successfully initialized"
                 }
                 logger.info("✅ Test 1: Client OK")
             else:
                 results["tests"]["client_initialized"] = {
-                    "status": "❌ FEHLER",
-                    "message": "Supabase Client ist None"
+                    "status": "❌ ERROR",
+                    "message": "Supabase client is None"
                 }
-                logger.error("❌ Test 1: Client ist None")
+                logger.error("❌ Test 1: Client is None")
         except Exception as e:
             results["tests"]["client_initialized"] = {
-                "status": "❌ FEHLER",
-                "message": f"Client-Fehler: {str(e)}"
+                "status": "❌ ERROR",
+                "message": f"Client error: {str(e)}"
             }
-            logger.error(f"❌ Test 1 Fehler: {e}")
+            logger.error(f"❌ Test 1 error: {e}")
         
-        # Test 2: Kann auf profiles-Tabelle zugreifen?
+        # Test 2: Can access profiles table?
         try:
             response = supabase_service.client.table('profiles').select('id').limit(1).execute()
             results["tests"]["profiles_table"] = {
                 "status": "✅ OK",
-                "message": f"profiles-Tabelle erreichbar",
+                "message": f"profiles table accessible",
                 "data_count": len(response.data) if response.data else 0
             }
-            logger.info(f"✅ Test 2: profiles-Tabelle OK ({len(response.data) if response.data else 0} Einträge)")
+            logger.info(f"✅ Test 2: profiles table OK ({len(response.data) if response.data else 0} entries)")
         except Exception as e:
             results["tests"]["profiles_table"] = {
-                "status": "❌ FEHLER",
-                "message": f"Fehler beim Zugriff: {str(e)}"
+                "status": "❌ ERROR",
+                "message": f"Error accessing table: {str(e)}"
             }
-            logger.error(f"❌ Test 2 Fehler: {e}")
+            logger.error(f"❌ Test 2 error: {e}")
         
-        # Test 3: Kann auf parent_cells-Tabelle zugreifen?
+        # Test 3: Can access parent_cells table?
         try:
             response = supabase_service.client.table('parent_cells').select('id').limit(1).execute()
             results["tests"]["parent_cells_table"] = {
                 "status": "✅ OK",
-                "message": f"parent_cells-Tabelle erreichbar",
+                "message": f"parent_cells table accessible",
                 "data_count": len(response.data) if response.data else 0
             }
-            logger.info(f"✅ Test 3: parent_cells-Tabelle OK ({len(response.data) if response.data else 0} Einträge)")
+            logger.info(f"✅ Test 3: parent_cells table OK ({len(response.data) if response.data else 0} entries)")
         except Exception as e:
             results["tests"]["parent_cells_table"] = {
-                "status": "⚠️ WARNUNG",
-                "message": f"Tabelle existiert noch nicht oder Fehler: {str(e)}",
-                "hint": "Führe database/QUICK_TEST_SCHEMA.sql in Supabase aus!"
+                "status": "⚠️ WARNING",
+                "message": f"Table does not exist yet or error: {str(e)}",
+                "hint": "Run database/QUICK_TEST_SCHEMA.sql in Supabase!"
             }
-            logger.warning(f"⚠️ Test 3: parent_cells Fehler: {e}")
+            logger.warning(f"⚠️ Test 3: parent_cells error: {e}")
         
-        # Test 4: Kann auf child_cells-Tabelle zugreifen?
+        # Test 4: Can access child_cells table?
         try:
             response = supabase_service.client.table('child_cells').select('id').limit(1).execute()
             results["tests"]["child_cells_table"] = {
                 "status": "✅ OK",
-                "message": f"child_cells-Tabelle erreichbar",
+                "message": f"child_cells table accessible",
                 "data_count": len(response.data) if response.data else 0
             }
-            logger.info(f"✅ Test 4: child_cells-Tabelle OK ({len(response.data) if response.data else 0} Einträge)")
+            logger.info(f"✅ Test 4: child_cells table OK ({len(response.data) if response.data else 0} entries)")
         except Exception as e:
             results["tests"]["child_cells_table"] = {
-                "status": "⚠️ WARNUNG",
-                "message": f"Tabelle existiert noch nicht oder Fehler: {str(e)}",
-                "hint": "Führe database/QUICK_TEST_SCHEMA.sql in Supabase aus!"
+                "status": "⚠️ WARNING",
+                "message": f"Table does not exist yet or error: {str(e)}",
+                "hint": "Run database/QUICK_TEST_SCHEMA.sql in Supabase!"
             }
-            logger.warning(f"⚠️ Test 4: child_cells Fehler: {e}")
+            logger.warning(f"⚠️ Test 4: child_cells error: {e}")
         
-        # Gesamtstatus
+        # Overall status
         all_ok = all(
             test.get("status", "").startswith("✅") 
             for test in results["tests"].values()
@@ -115,48 +115,48 @@ async def test_supabase_connection():
         )
         
         if all_ok:
-            results["status"] = "✅ ALLES OK"
-            results["message"] = "Supabase-Verbindung funktioniert!"
+            results["status"] = "✅ ALL OK"
+            results["message"] = "Supabase connection works!"
         else:
             critical_errors = [
                 name for name, test in results["tests"].items()
                 if test.get("status", "").startswith("❌")
             ]
             if critical_errors:
-                results["status"] = "❌ FEHLER"
-                results["message"] = f"Kritische Fehler bei: {', '.join(critical_errors)}"
+                results["status"] = "❌ ERROR"
+                results["message"] = f"Critical errors in: {', '.join(critical_errors)}"
             else:
-                results["status"] = "⚠️ WARNUNG"
-                results["message"] = "Verbindung OK, aber einige Tabellen fehlen noch"
+                results["status"] = "⚠️ WARNING"
+                results["message"] = "Connection OK, but some tables are missing"
         
         logger.info("=" * 70)
-        logger.info(f"🧪 Test abgeschlossen: {results['status']}")
+        logger.info(f"🧪 Test completed: {results['status']}")
         logger.info("=" * 70)
         
         return results
     
     except Exception as e:
-        logger.error(f"❌ Unerwarteter Fehler beim Supabase-Test: {e}", exc_info=True)
+        logger.error(f"❌ Unexpected error during Supabase test: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fehler beim Testen der Verbindung: {str(e)}"
+            detail=f"Error testing connection: {str(e)}"
         )
 
 
 @router.get(
     "/test-supabase-write",
-    summary="🧪 Test Supabase Schreibzugriff",
-    description="Erstellt Test-Parent-Cell um Schreibzugriff zu prüfen"
+    summary="🧪 Test Supabase Write Access",
+    description="Creates a test parent cell to verify write access"
 )
 async def test_supabase_write():
     """
-    Testet ob wir in Supabase schreiben können.
-    Erstellt eine Test-Parent-Cell und löscht sie wieder.
+    Tests whether we can write to Supabase.
+    Creates a test parent cell and then deletes it.
     """
     try:
-        logger.info("🧪 Teste Supabase Schreibzugriff...")
+        logger.info("🧪 Testing Supabase write access...")
         
-        # Test-Daten
+        # Test data
         test_data = {
             'cell_key': 'test_00.00_00.00',
             'center_lat': 0.0,
@@ -169,28 +169,28 @@ async def test_supabase_write():
             'last_scanned_at': 'now()'
         }
         
-        # Versuche zu erstellen
-        logger.info("   Erstelle Test-Parent-Cell...")
+        # Try creating
+        logger.info("   Creating test parent cell...")
         response = supabase_service.client.table('parent_cells').insert(test_data).execute()
         
         if not response.data or len(response.data) == 0:
             return {
-                "status": "❌ FEHLER",
-                "message": "Konnte Test-Daten nicht erstellen",
-                "error": "Keine Daten in Response"
+                "status": "❌ ERROR",
+                "message": "Could not create test data",
+                "error": "No data in response"
             }
         
         created_id = response.data[0]['id']
-        logger.info(f"   ✅ Test-Parent-Cell erstellt: {created_id}")
+        logger.info(f"   ✅ Test parent cell created: {created_id}")
         
-        # Lösche wieder
-        logger.info("   Lösche Test-Parent-Cell...")
+        # Delete again
+        logger.info("   Deleting test parent cell...")
         delete_response = supabase_service.client.table('parent_cells').delete().eq('id', created_id).execute()
-        logger.info("   ✅ Test-Parent-Cell gelöscht")
+        logger.info("   ✅ Test parent cell deleted")
         
         return {
             "status": "✅ OK",
-            "message": "Schreibzugriff funktioniert!",
+            "message": "Write access works!",
             "details": {
                 "created_id": created_id,
                 "cell_key": test_data['cell_key']
@@ -198,10 +198,10 @@ async def test_supabase_write():
         }
     
     except Exception as e:
-        logger.error(f"❌ Fehler beim Schreibtest: {e}", exc_info=True)
+        logger.error(f"❌ Error during write test: {e}", exc_info=True)
         return {
-            "status": "❌ FEHLER",
-            "message": f"Schreibzugriff fehlgeschlagen: {str(e)}",
-            "hint": "Prüfe: 1) SQL-Schema ausgeführt? 2) RLS-Policies korrekt? 3) .env korrekt?"
+            "status": "❌ ERROR",
+            "message": f"Write access failed: {str(e)}",
+            "hint": "Check: 1) SQL schema executed? 2) RLS policies correct? 3) .env configuration correct?"
         }
-
+    
