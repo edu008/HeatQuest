@@ -111,53 +111,67 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        setTimeout(() => {
-          if (session.user.app_metadata.provider !== 'email') {
-            ensureProfile(session.user.id, session.user.user_metadata)
-          } else {
-            loadProfile(session.user.id)
-          }
-        }, 0)
-      } else {
-        setProfile(null)
-      }
-    })
-
-    supabase.auth
-      .getSession()
-      .then(({ data: { session }, error: sessionError }) => {
+    let subscription: any = null
+    
+    const initAuth = async () => {
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession()
+        
         if (sessionError) {
+          console.warn('Session error:', sessionError.message)
           setInitError(sessionError.message)
         }
 
+        setSession(data.session)
+        setUser(data.session?.user ?? null)
+
+        if (data.session?.user) {
+          try {
+            if (data.session.user.app_metadata.provider !== 'email') {
+              await ensureProfile(data.session.user.id, data.session.user.user_metadata)
+            } else {
+              await loadProfile(data.session.user.id)
+            }
+          } catch (profileError) {
+            console.warn('Profile load failed, continuing without profile:', profileError)
+          }
+        }
+      } catch (err) {
+        console.error('Auth initialization failed:', err)
+        setInitError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
 
         if (session?.user) {
-          setTimeout(() => {
+          try {
             if (session.user.app_metadata.provider !== 'email') {
-              ensureProfile(session.user.id, session.user.user_metadata)
+              await ensureProfile(session.user.id, session.user.user_metadata)
             } else {
-              loadProfile(session.user.id)
+              await loadProfile(session.user.id)
             }
-          }, 0)
+          } catch (error) {
+            console.warn('Profile operation failed:', error)
+          }
+        } else {
+          setProfile(null)
         }
       })
-      .catch((err) => {
-        setInitError(err instanceof Error ? err.message : 'Unknown error')
-      })
-      .finally(() => {
-        setLoading(false)
-      })
+      
+      subscription = data.subscription
+    }
 
-    return () => subscription.unsubscribe()
+    initAuth()
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   const signUp = async (email: string, password: string, username: string) => {
