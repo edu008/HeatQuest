@@ -7,7 +7,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useGame } from "@/contexts/GameContext";
 import { ArrowLeft, MapPin, CheckCircle2, Flame, Sparkles, Target, Clock, FileText, Camera, Flag } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useI18n } from "@/contexts/I18nContext";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -23,7 +22,6 @@ const MissionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { missions, completeMission } = useGame();
-  const { t } = useI18n();
 
   const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
   const [actionProofs, setActionProofs] = useState<Record<number, string>>({});
@@ -74,7 +72,7 @@ const MissionDetail = () => {
     reader.onload = () => {
       const url = reader.result as string;
       setActionProofs((prev) => ({ ...prev, [actionIndex]: url }));
-      toast({ title: t("mission_photo_added") });
+      toast({ title: "Photo added ✅" });
       setCheckedActions((prev) => {
         const next = new Set(prev);
         next.add(actionIndex);
@@ -86,16 +84,16 @@ const MissionDetail = () => {
 
   const handleComplete = () => {
     if (checkedActions.size === 0) {
-      toast({ title: t("mission_complete_toast_select_action"), variant: "destructive" });
+      toast({ title: "Select at least one action", variant: "destructive" });
       return;
     }
     const missingProof = Array.from(checkedActions).some((i) => !actionProofs[i]);
     if (missingProof) {
-      toast({ title: t("mission_complete_toast_add_photo"), variant: "destructive" });
+      toast({ title: "Please add photos for checked actions", variant: "destructive" });
       return;
     }
     completeMission(mission.id);
-    toast({ title: t("mission_complete_success"), description: t("mission_complete_success_xp") });
+    toast({ title: "Mission completed! 🎉", description: "+100 XP" });
     navigate("/profile");
   };
 
@@ -141,11 +139,11 @@ const MissionDetail = () => {
             className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted"
           >
             <ArrowLeft className="h-4 w-4" />
-            {t("mission_back")}
+            Back
           </button>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            <span>{mission.locationName || t("mission_fallback_location")}</span>
+            <span>{mission.locationName || "Unknown location"}</span>
           </div>
         </div>
 
@@ -168,15 +166,15 @@ const MissionDetail = () => {
           <div className="grid grid-cols-3 gap-2">
             <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium">{t("mission_xp_bonus")}</span>
+              <span className="text-xs font-medium">+100 XP</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-2">
               <Target className="h-4 w-4 text-accent" />
-              <span className="text-xs font-medium">{t("mission_steps", { count: mission.actions.length })}</span>
+              <span className="text-xs font-medium">{mission.actions.length} steps</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium">{t("mission_minutes", { minutes: timeEstimate })}</span>
+              <span className="text-xs font-medium">{timeEstimate} min</span>
             </div>
           </div>
         </div>
@@ -185,7 +183,7 @@ const MissionDetail = () => {
         <div className="grid grid-rows-2 gap-3">
           {/* Description card */}
           <div className="rounded-xl border bg-card p-3 shadow-sm">
-            <div className="mb-2 text-sm font-medium">{t("mission_context_title")}</div>
+            <div className="mb-2 text-sm font-medium">Context</div>
             <div className="flex items-start gap-2">
               <FileText className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               <p className="text-sm text-muted-foreground leading-snug break-words max-h-20 overflow-hidden">
@@ -196,7 +194,7 @@ const MissionDetail = () => {
 
           {/* Actions */}
           <div className="rounded-xl border bg-card p-3 shadow-sm">
-            <div className="mb-2 text-sm font-medium">{t("mission_actions_title")}</div>
+            <div className="mb-2 text-sm font-medium">Actions</div>
             <ul className="grid grid-cols-2 gap-2">
               {mission.actions.map((action, index) => {
                 const isChecked = checkedActions.has(index);
@@ -212,7 +210,7 @@ const MissionDetail = () => {
                       <span className="text-xs truncate min-w-0">{action}</span>
                     </label>
                     <span className={isChecked ? "shrink-0 text-[10px] px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200" : "shrink-0 text-[10px] px-2 py-1 rounded-full bg-muted text-muted-foreground border"}>
-                      {isChecked ? t("mission_action_done") : t("mission_action_todo")}
+                      {isChecked ? "Done" : "Todo"}
                     </span>
                   </li>
                 );
@@ -240,7 +238,7 @@ const MissionDetail = () => {
             }}
           >
             <CheckCircle2 className="h-5 w-5" />
-            {t("mission_complete_cta")}
+            Complete Mission
           </motion.button>
           {/* Hidden file input for action proofs */}
           <input
@@ -266,18 +264,18 @@ const MissionDetail = () => {
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
                 <Camera className="h-5 w-5 text-orange-500" />
-                {t("mission_photo_required_title")}
+                Photo required
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {t("mission_photo_required_desc")}
+                Please add photos for checked actions
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setUploadPromptOpen(false)} className="rounded-xl">
-                {t("cancel")}
+                Cancel
               </AlertDialogCancel>
               <AlertDialogAction onClick={handleOpenCamera} className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl">
-                {t("openCamera")}
+                Open Camera
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

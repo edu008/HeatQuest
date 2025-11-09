@@ -64,11 +64,11 @@ const Analyze = () => {
 
     if (mockResult.is_hotspot) {
       toast({
-        title: "Hotspot gefunden! 🔥",
+        title: "Hotspot detected! 🔥",
       });
     } else {
       toast({
-        title: "Kein kritischer Hotspot erkannt.",
+        title: "No critical hotspot detected.",
       });
     }
   };
@@ -81,8 +81,8 @@ const Analyze = () => {
       navigator.geolocation.getCurrentPosition((position) => {
         const newMission = {
           id: Date.now().toString(),
-          title: `Neuer Hotspot`,
-          description: "Von dir entdeckter Hotspot",
+          title: `New Hotspot`,
+          description: "Hotspot discovered by you",
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           heatRisk: Math.round(result.heat_risk_score * 100),
@@ -94,7 +94,7 @@ const Analyze = () => {
 
         addMission(newMission);
         toast({
-          title: "Mission erstellt! 🚀",
+          title: "Mission created! 🚀",
         });
         navigate(`/mission/${newMission.id}`);
       });
@@ -119,9 +119,9 @@ const Analyze = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Hotspot Analyse</h1>
+            <h1 className="text-xl font-bold">Hotspot Analysis</h1>
             <p className="text-sm text-muted-foreground">
-              Foto analysieren und Mission erstellen
+              Analyze photo and create a mission
             </p>
           </div>
         </div>
@@ -143,14 +143,14 @@ const Analyze = () => {
                   <Camera className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold">Foto aufnehmen oder hochladen</p>
+                  <p className="font-semibold">Take a photo or upload one</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Straße, Park, Platz oder andere urbane Fläche
+                    Street, park, square or other urban area
                   </p>
                 </div>
                 <Button type="button" variant="outline" className="rounded-xl">
                   <Upload className="w-4 h-4 mr-2" />
-                  Bild auswählen
+                  Choose image
                 </Button>
               </div>
             </label>
@@ -170,10 +170,10 @@ const Analyze = () => {
                   {analyzing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analysiere...
+                      Analyzing...
                     </>
                   ) : (
-                    "🔍 Analysieren"
+                    "🔍 Analyze"
                   )}
                 </Button>
                 <Button
@@ -185,7 +185,7 @@ const Analyze = () => {
                   }}
                   className="rounded-xl"
                 >
-                  Neu
+                  New
                 </Button>
               </div>
             </div>
@@ -219,7 +219,7 @@ const Analyze = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-2">Gründe</h3>
+                  <h3 className="font-semibold mb-2">Reasons</h3>
                   <ul className="space-y-2">
                     {result.reasons.map((reason, i) => (
                       <li
@@ -234,9 +234,7 @@ const Analyze = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-2">
-                    Vorgeschlagene Aktionen
-                  </h3>
+                  <h3 className="font-semibold mb-2">Suggested Actions</h3>
                   <ul className="space-y-2">
                     {result.suggested_actions.map((action, i) => (
                       <li
@@ -255,7 +253,7 @@ const Analyze = () => {
                     onClick={createMission}
                     className="w-full rounded-xl bg-gradient-to-r from-heat via-primary to-cool-intense hover:shadow-lg"
                   >
-                    🚀 Mission erstellen
+                    🚀 Create Mission
                   </Button>
                 )}
               </div>

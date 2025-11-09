@@ -34,12 +34,12 @@ interface GameContextType {
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-// Dummy missions für Demo
+// Dummy missions for demo
 const dummyMissions: Mission[] = [
   {
     id: "1",
-    title: "Bahnhofplatz Bern",
-    description: "Große Asphaltfläche ohne Schatten",
+    title: "Bern Station Square",
+    description: "Large asphalt area without shade",
     lat: 46.9491,
     lng: 7.4386,
     heatRisk: 85,
@@ -57,8 +57,8 @@ const dummyMissions: Mission[] = [
   },
   {
     id: "2",
-    title: "Paradeplatz Zürich",
-    description: "Zentrale Platzfläche mit hoher Hitzebelastung",
+    title: "Paradeplatz Zurich",
+    description: "Central square with high heat exposure",
     lat: 47.3699,
     lng: 8.5396,
     heatRisk: 78,
@@ -76,8 +76,8 @@ const dummyMissions: Mission[] = [
   },
   {
     id: "3",
-    title: "Place Neuve Genf",
-    description: "Offener Platz mit minimaler Vegetation",
+    title: "Place Neuve Geneva",
+    description: "Open plaza with minimal vegetation",
     lat: 46.2,
     lng: 6.1422,
     heatRisk: 72,
