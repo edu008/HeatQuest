@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GameProvider } from "./contexts/GameContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { Toaster } from "@/components/ui/sonner";
 
 import Login from "./pages/Login";
 import MapView from "./pages/MapView";
@@ -40,7 +39,6 @@ const App = () => (
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-          <Toaster />
         </BrowserRouter>
       </GameProvider>
     </AuthProvider>

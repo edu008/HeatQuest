@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/integrations/supabase/client'
-import { toast } from 'sonner'
 
 interface Profile {
   id: string
@@ -66,7 +65,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       setProfile(data)
     } catch (error) {
-      toast.error('Failed to load profile')
+      console.error('Failed to load profile:', error)
     }
   }
 
@@ -106,9 +105,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (error) throw error
       
       setProfile(newProfile)
-      toast.success(`Welcome, ${username}!`)
     } catch (error) {
-      toast.error('Failed to create profile')
+      console.error('Failed to create profile:', error)
     }
   }
 
@@ -162,7 +160,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Sign Up
   const signUp = async (email: string, password: string, username: string) => {
     try {
       const redirectUrl = `${window.location.origin}/auth/callback`
@@ -174,7 +171,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (error) throw error
 
-      // Erstelle Profil
       if (data.user) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -188,16 +184,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
         if (profileError) throw profileError
       }
-
-      toast.success('Account erfolgreich erstellt! 🎉')
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'Registrierung fehlgeschlagen')
+      console.error('Registration failed:', authError.message)
       throw error
     }
   }
 
-  // Sign In
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -206,11 +199,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       })
 
       if (error) throw error
-
-      toast.success('Willkommen zurück! 🔥')
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'Login fehlgeschlagen')
+      console.error('Login failed:', authError.message)
       throw error
     }
   }
@@ -224,32 +215,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         },
       })
 
-      if (error) {
-        toast.error(`OAuth Error: ${error.message}`)
-        throw error
-      }
+      if (error) throw error
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'OAuth Login failed')
+      console.error('OAuth failed:', authError.message)
       throw error
     }
   }
 
-  // Sign Out
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-
-      toast.success('Erfolgreich abgemeldet')
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'Abmeldung fehlgeschlagen')
+      console.error('Sign out failed:', authError.message)
       throw error
     }
   }
 
-  // Update Profile
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return
 
@@ -261,12 +245,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (error) throw error
 
-      // Aktualisiere lokalen State
       setProfile((prev) => (prev ? { ...prev, ...updates } : null))
-      toast.success('Profil aktualisiert! ✅')
     } catch (error) {
-      console.error('Error updating profile:', error)
-      toast.error('Profil-Update fehlgeschlagen')
+      console.error('Profile update failed:', error)
       throw error
     }
   }
