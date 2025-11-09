@@ -19,6 +19,7 @@ interface AuthContextType {
   loading: boolean
   signUp: (email: string, password: string, username: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
+  signInWithOAuth: (provider: 'github' | 'google') => Promise<void>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
 }
@@ -59,6 +60,49 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }
 
+  // Erstelle Profil falls noch nicht vorhanden (für OAuth-Logins)
+  const ensureProfile = async (userId: string, metadata?: any) => {
+    try {
+      // Prüfe ob Profil existiert
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (existingProfile) {
+        setProfile(existingProfile)
+        return
+      }
+
+      // Erstelle neues Profil
+      const username = 
+        metadata?.user_name || 
+        metadata?.full_name || 
+        metadata?.email?.split('@')[0] || 
+        `user_${userId.slice(0, 8)}`
+
+      const { data: newProfile, error } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          username,
+          avatar_url: metadata?.avatar_url || metadata?.picture || null,
+          points: 0,
+          level: 1,
+          missions_completed: 0,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      setProfile(newProfile)
+      toast.success(`Willkommen, ${username}! 🎉`)
+    } catch (error) {
+      console.error('Error ensuring profile:', error)
+    }
+  }
+
   // Initialisiere Auth State
   useEffect(() => {
     // Hole aktuelle Session
@@ -74,11 +118,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Höre auf Auth Changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      
       if (session?.user) {
-        loadProfile(session.user.id)
+        // Bei OAuth-Login (SIGNED_IN) stelle sicher, dass Profil existiert
+        if (event === 'SIGNED_IN' && session.user.app_metadata.provider !== 'email') {
+          await ensureProfile(session.user.id, session.user.user_metadata)
+        } else {
+          await loadProfile(session.user.id)
+        }
       } else {
         setProfile(null)
       }
@@ -138,6 +188,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }
 
+  // OAuth Login (GitHub, Google)
+  const signInWithOAuth = async (provider: 'github' | 'google') => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/map`,
+        },
+      })
+
+      if (error) throw error
+      
+      // Note: User wird automatisch weitergeleitet, daher kein toast hier
+    } catch (error) {
+      const authError = error as AuthError
+      toast.error(authError.message || 'OAuth Login fehlgeschlagen')
+      throw error
+    }
+  }
+
   // Sign Out
   const signOut = async () => {
     try {
@@ -181,6 +251,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     loading,
     signUp,
     signIn,
+    signInWithOAuth,
     signOut,
     updateProfile,
   }

@@ -12,9 +12,16 @@ import MapboxMap from "@/components/MapboxMap";
 const MapView = () => {
   const { missions, setActiveMission, user } = useGame();
   const navigate = useNavigate();
-  const [mapboxToken, setMapboxToken] = useState<string>(() => localStorage.getItem("mapbox_public_token") || "");
+  
+  // Mapbox Token aus Environment Variable oder localStorage (Fallback)
+  const envToken = import.meta.env.VITE_MAPBOX_TOKEN;
+  const [mapboxToken, setMapboxToken] = useState<string>(() => {
+    return envToken || localStorage.getItem("mapbox_public_token") || "";
+  });
+  
   const handleSaveToken = () => {
     localStorage.setItem("mapbox_public_token", mapboxToken);
+    window.location.reload(); // Reload um Token zu aktivieren
   };
 
   useEffect(() => {
