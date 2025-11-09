@@ -16,23 +16,28 @@ pip install -r requirements.txt
 Create a `.env` file in the `backend/` folder:
 
 ```env
-# Required: Mapbox Token (for satellite images)
-MAP=your_mapbox_token_here
+# Mapbox (Required for satellite images)
+MAP=pk.eyJ1IjoieW91ci10b2tlbiIsImEiOiJja...
 
-# Optional: AWS (Landsat data is public, no credentials needed)
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
+# Supabase (Required for database)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+
+# AWS (Optional - Landsat/Sentinel data is public)
 AWS_REGION=us-west-2
-GOOGLE_APPLICATION_CREDENTIALS=vertex-access.json
-VERTEX_PROJECT_ID=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_KEY=
-SUPABASE_URL=
-MAP=
+
+# AI Providers (at least one required)
+OPENAI_API_KEY=sk-...                    # OpenAI GPT-4 Vision
+GOOGLE_GEMINI_API_KEY=...                # Google Gemini API
+GOOGLE_CLOUD_PROJECT=your-project-id     # For Vertex AI
+VERTEX_AI_CREDENTIALS=vertex-access.json # Service Account JSON
 ```
 
 **Where to get API keys:**
 - **Mapbox Token**: https://account.mapbox.com/access-tokens/
+- **Supabase**: https://supabase.com (create free project)
+- **OpenAI**: https://platform.openai.com/api-keys
+- **Google Cloud**: https://console.cloud.google.com
 
 ### 3. **Run the Server**
 
@@ -132,26 +137,201 @@ backend/
 ├── app/
 │   ├── main.py                 # FastAPI app entry point
 │   ├── api/v1/
-│   │   ├── heatmap.py         # Heatmap endpoints
-│   │   └── location_description.py  # AI analysis endpoints
-│   ├── services/
-│   │   ├── grid_service.py    # Grid generation & heat scores
-│   │   ├── landsat_service.py # Landsat temperature data
-│   │   ├── sentinel_service.py # Sentinel-2 NDVI data
-│   │   ├── stac_service.py    # Satellite scene discovery
-│   │   └── location_description_service.py  # AI image analysis
-│   ├── models/
-│   │   ├── heatmap.py         # Pydantic models
-│   │   └── location_description.py
-│   └── core/
-│       ├── config.py          # Configuration
+│   │   ├── heatmap.py         # Heatmap + Auto-Analysis endpoints
+│   │   ├── missions.py        # Mission CRUD endpoints
+│   │   ├── location_description.py  # AI analysis endpoints
+│   │   └── test.py            # Health check endpoints
+│   ├── services/              # Business Logic Layer
+│   │   ├── grid_service.py              # Grid generation & calculations
+│   │   ├── landsat_service.py           # Temperature data from AWS
+│   │   ├── sentinel_service.py          # NDVI vegetation data
+│   │   ├── stac_service.py              # Satellite scene search
+│   │   ├── parent_cell_service.py       # Smart caching system
+│   │   ├── location_description_service.py  # AI image analysis
+│   │   ├── mission_generation_service.py    # Auto-mission creation
+│   │   └── visualization_service.py     # PNG heatmap generation
+│   ├── models/                # Data Models
+│   │   ├── heatmap.py         # Heatmap request/response
+│   │   ├── mission.py         # Mission models
+│   │   └── location_description.py  # AI analysis models
+│   └── core/                  # Core Configuration
+│       ├── config.py          # Environment settings
+│       ├── supabase_client.py # Database connection
+│       ├── aws_client.py      # AWS S3 client
 │       └── geo.py             # Geospatial utilities
-├── cache/                      # Temporary data storage
-├── vertex-access.json         # Google Cloud service account
+├── cache/
+│   └── satellite_images/      # Downloaded satellite images
+├── vertex-access.json         # Google Cloud credentials
 ├── requirements.txt
 ├── .env                       # Environment variables
 └── README.md
 ```
+
+---
+
+## 🔧 Services Explained
+
+### Core Services
+
+#### 1. **grid_service.py** - Grid Generation & Heat Score Calculation
+**Purpose:** Creates geographical grid cells and calculates heat scores
+
+**Main Functions:**
+- `generate_grid_cells(center_lat, center_lon, radius_m, cell_size_m)` - Creates grid of cells around a point
+- `calculate_heat_score(temperature, ndvi)` - Computes heat risk: `temp - (0.3 × NDVI) - 15`
+- `assign_to_parent_cell(lat, lon)` - Maps coordinates to parent cell (5km grid)
+
+**Use Case:** Called by heatmap API to create analysis grid
+
+---
+
+#### 2. **landsat_service.py** - Temperature Data from Landsat 8/9
+**Purpose:** Fetches surface temperature from AWS Landsat archive
+
+**Main Functions:**
+- `get_temperature_for_location(lat, lon)` - Downloads Landsat thermal band (B10)
+- `search_landsat_scenes(bbox, days_back)` - Finds available satellite scenes
+- `extract_temperature(band_data)` - Converts DN values to Celsius
+
+**Data Source:** AWS Public Dataset (Landsat Collection 2)  
+**Resolution:** 30m per pixel  
+**Update Frequency:** Every 16 days
+
+---
+
+#### 3. **sentinel_service.py** - Vegetation Data (NDVI)
+**Purpose:** Calculates vegetation index from Sentinel-2 satellite
+
+**Main Functions:**
+- `get_ndvi_for_location(lat, lon)` - Fetches red/NIR bands and calculates NDVI
+- `calculate_ndvi(red_band, nir_band)` - Formula: `(NIR - RED) / (NIR + RED)`
+
+**Data Source:** AWS Public Dataset (Sentinel-2)  
+**Resolution:** 10m per pixel  
+**Range:** -1.0 (water) to +1.0 (dense vegetation)
+
+---
+
+#### 4. **stac_service.py** - Satellite Scene Discovery
+**Purpose:** Searches for available satellite imagery using STAC API
+
+**Main Functions:**
+- `search_landsat_stac(bbox, date_range)` - Finds Landsat scenes
+- `search_sentinel_stac(bbox, date_range)` - Finds Sentinel-2 scenes
+- `get_best_scene(scenes)` - Selects scene with least cloud cover
+
+**STAC Endpoints:**
+- Landsat: `https://landsatlook.usgs.gov/stac-server`
+- Sentinel: `https://earth-search.aws.element84.com/v1`
+
+---
+
+#### 5. **parent_cell_service.py** - Smart Caching System
+**Purpose:** Reduces API calls by 90% through intelligent caching
+
+**How it works:**
+1. **Parent Cells** - 5km × 5km grid covering the world
+2. **Child Cells** - 30m × 30m detailed analysis cells
+3. **Caching** - Once analyzed, data persists in Supabase
+
+**Main Functions:**
+- `find_or_create_parent_cell(lat, lon)` - Gets/creates 5km parent cell
+- `get_cached_child_cells(parent_cell_id)` - Retrieves analyzed cells
+- `should_analyze_cell(heat_score)` - Decides if cell needs AI analysis
+
+**Database Tables:**
+- `parent_cells` - 5km grid cache
+- `child_cells` - 30m detailed cells
+- `cell_analyses` - AI analysis results
+
+---
+
+#### 6. **location_description_service.py** - AI Image Analysis
+**Purpose:** Analyzes satellite images with multiple AI providers
+
+**Supported AI Providers:**
+1. **Google Vertex AI (Gemini 2.0 Flash)** - Primary
+2. **OpenAI GPT-4 Vision** - Fallback
+3. **Google Gemini API** - Alternative
+
+**Main Functions:**
+- `describe_location(lat, lon, zoom)` - Full analysis pipeline
+- `_fetch_satellite_image()` - Downloads from Mapbox or Google Maps
+- `_analyze_with_vertex_ai()` - Sends to Gemini Vision
+- `_analyze_with_openai()` - Sends to GPT-4 Vision
+
+**Output:**
+- Description of visible features
+- Main cause of heat stress
+- 2-4 suggested cooling actions
+
+---
+
+#### 7. **mission_generation_service.py** - Auto-Mission Creation
+**Purpose:** Automatically creates missions from hotspot detection
+
+**Workflow:**
+1. User scans location → Hotspots detected (heat_score > 15)
+2. AI analyzes hotspot → Gets description + actions
+3. Service creates mission → Saves to Supabase
+4. Mission appears on map → User can accept
+
+**Main Functions:**
+- `generate_mission_from_analysis(cell_analysis, user_id)` - Creates mission
+- `_generate_mission_title(analysis)` - Smart title based on location type
+- `_generate_mission_description(analysis)` - Uses AI summary
+- `_generate_mission_reasons(analysis)` - Heat stress causes
+- `_generate_suggested_actions(analysis)` - Actionable steps
+
+**Mission Types:**
+- `auto_generated` - From hotspot analysis
+- `user_discovered` - User-submitted
+- `community` - Shared missions
+
+---
+
+#### 8. **visualization_service.py** - Heatmap PNG Generation
+**Purpose:** Creates visual heatmap images for download/sharing
+
+**Main Functions:**
+- `generate_heatmap_png(grid_cells)` - Creates PNG from grid data
+- `apply_color_gradient(heat_scores)` - Maps scores to colors (blue→yellow→red)
+- `overlay_on_map(heatmap, base_map)` - Combines with satellite image
+
+**Output:** PNG file with color-coded heat visualization
+
+---
+
+### Core Modules
+
+#### 9. **supabase_client.py** - Database Connection
+**Purpose:** Manages PostgreSQL database connection via Supabase
+
+**Features:**
+- Connection pooling
+- Auto-reconnect on failure
+- Type-safe queries with Supabase SDK
+
+**Tables:**
+- `profiles` - User accounts & stats
+- `missions` - All missions
+- `parent_cells` - 5km cache grid
+- `child_cells` - 30m analysis cells
+- `cell_analyses` - AI analysis results
+
+---
+
+#### 10. **aws_client.py** - AWS S3 Access
+**Purpose:** Connects to AWS for Landsat/Sentinel data
+
+**Features:**
+- Anonymous access (no credentials needed)
+- Optimized for public datasets
+- COG (Cloud-Optimized GeoTIFF) support
+
+**Datasets:**
+- `s3://usgs-landsat/collection02/level-2/`
+- `s3://sentinel-s2-l2a/`
 
 ---
 
@@ -170,22 +350,42 @@ The `vertex-access.json` file is **already configured** with:
 
 ## 📊 How It Works
 
-### Heatmap Workflow:
+### Complete Workflow (with Smart Caching):
 
-1. **Input**: GPS coordinates + radius
-2. **Grid Generation**: Creates grid cells (30m or custom size)
-3. **Landsat Data**: Fetches surface temperature from AWS
-4. **Sentinel-2 Data**: Gets vegetation index (NDVI)
-5. **Heat Score Calculation**: `heat_score = temperature - (0.3 × NDVI)`
-6. **Output**: JSON with all grid cells or interactive map
+```
+User Opens Map
+    ↓
+1. Frontend requests heatmap (lat, lon, radius, user_id)
+    ↓
+2. Backend checks Parent Cell (5km grid)
+    ├─ Found → Load cached child cells from database
+    └─ Not Found → Create new parent cell
+    ↓
+3. Grid Service generates 30m cells in radius
+    ↓
+4. For each cell:
+    ├─ Landsat Service → Get temperature
+    ├─ Sentinel Service → Get NDVI
+    └─ Calculate heat_score = temp - (0.3 × NDVI) - 15
+    ↓
+5. Identify hotspots (heat_score > 15)
+    ↓
+6. For top 3 hotspots (not yet analyzed):
+    ├─ Location Description Service → AI analyzes satellite image
+    ├─ Mission Generation Service → Creates mission
+    └─ Save to database (cell_analyses, missions)
+    ↓
+7. Return heatmap + auto-generated missions
+    ↓
+Frontend displays map with mission markers
+```
 
-### AI Analysis Workflow:
+### Smart Caching Benefits:
 
-1. **Input**: GPS coordinates + zoom level
-2. **Fetch Satellite Image**: Downloads from Mapbox
-3. **Save Image**: Stores locally in `cache/satellite_images/`
-4. **AI Analysis**: Sends to Google Vertex AI (Gemini Vision)
-5. **Output**: Natural language description of the location
+- **First scan**: Full analysis (~10 seconds)
+- **Cached scan**: Instant response (~0.5 seconds)
+- **Reduced AI calls**: Only new hotspots analyzed
+- **Database-backed**: Data persists across sessions
 
 ---
 
