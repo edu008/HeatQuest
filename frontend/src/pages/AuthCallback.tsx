@@ -35,6 +35,8 @@ const AuthCallback = () => {
         }
         
         if (session) {
+          console.log('✅ Setting needsLoginScan flag in sessionStorage');
+          sessionStorage.setItem('needsLoginScan', 'true');
           console.log('✅ Redirecting to map...');
           // Warte nochmal kurz damit AuthContext die Session laden kann
           await new Promise(resolve => setTimeout(resolve, 500));

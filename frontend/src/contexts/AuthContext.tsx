@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
 
 interface Profile {
   id: string
@@ -80,7 +79,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setProfile(data)
     } catch (error) {
       console.error('❌ Error loading profile:', error)
-      toast.error('Failed to load profile. Please refresh the page.')
     }
   }
 
@@ -136,10 +134,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       console.log('✅ Profile created:', newProfile)
       setProfile(newProfile)
-      toast.success(`Welcome, ${username}! 🎉`)
     } catch (error) {
       console.error('❌ Error ensuring profile:', error)
-      toast.error('Failed to create profile. Please try again.')
     }
   }
 
@@ -240,10 +236,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (profileError) throw profileError
       }
 
-      toast.success('Account erfolgreich erstellt! 🎉')
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'Registrierung fehlgeschlagen')
       throw error
     }
   }
@@ -258,10 +252,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (error) throw error
 
-      toast.success('Willkommen zurück! 🔥')
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'Login fehlgeschlagen')
       throw error
     }
   }
@@ -281,7 +273,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (error) {
         console.error('❌ OAuth Error:', error)
-        toast.error(`OAuth Error: ${error.message}`)
         throw error
       }
       
@@ -291,7 +282,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       const authError = error as AuthError
       console.error('❌ Caught Error:', authError)
-      toast.error(authError.message || 'OAuth Login failed')
       throw error
     }
   }
@@ -302,10 +292,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
 
-      toast.success('Erfolgreich abgemeldet')
     } catch (error) {
       const authError = error as AuthError
-      toast.error(authError.message || 'Abmeldung fehlgeschlagen')
       throw error
     }
   }
@@ -324,10 +312,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       // Aktualisiere lokalen State
       setProfile((prev) => (prev ? { ...prev, ...updates } : null))
-      toast.success('Profil aktualisiert! ✅')
     } catch (error) {
       console.error('Error updating profile:', error)
-      toast.error('Profil-Update fehlgeschlagen')
       throw error
     }
   }

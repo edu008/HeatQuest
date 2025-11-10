@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,15 +7,16 @@ import { useGame } from "@/contexts/GameContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
-import { Camera, Loader2 } from "lucide-react";
 import MapboxMap from "@/components/MapboxMap";
-import { useHeatmap } from "@/hooks/useHeatmap";
 
 const MapView = () => {
   const { missions, setActiveMission, user, loadMissions, missionsLoading } = useGame();
   const { user: authUser, loading } = useAuth();
   const navigate = useNavigate();
-  const { scanCurrentLocation, loading: scanLoading, data: heatmapData } = useHeatmap();
+  
+  // Track ob Missionen bereits beim normalen Seitenwechsel geladen wurden
+  const normalLoadDone = useRef(false);
+  const loginScanStarted = useRef(false);
   
   // Mapbox Token aus Environment Variable oder localStorage (Fallback)
   const envToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -28,7 +29,7 @@ const MapView = () => {
     window.location.reload(); // Reload um Token zu aktivieren
   };
 
-  // Automatischer Scan beim Laden der Map
+  // Login-Scan nur beim Login, nicht bei Seitenwechsel
   useEffect(() => {
     console.log('🗺️ MapView - Auth status:', { loading, hasUser: !!authUser, email: authUser?.email })
     
@@ -38,37 +39,76 @@ const MapView = () => {
       return;
     }
     
-    if (!loading && authUser && !heatmapData && !scanLoading) {
-      console.log('✅ User authenticated, auto-scanning current location...')
-      // Auto-scan nach kurzer Verzögerung
-      const timer = setTimeout(async () => {
-        try {
-          await scanCurrentLocation(500); // 500m radius
-        } catch (error) {
-          console.error('Auto-scan failed:', error);
-        }
-      }, 1000);
+    if (!loading && authUser) {
+      const needsLoginScan = sessionStorage.getItem('needsLoginScan');
       
-      return () => clearTimeout(timer);
-    }
-  }, [authUser, loading, navigate, heatmapData, scanLoading, scanCurrentLocation]);
-
-  // Lade Missionen automatisch nach einem erfolgreichen Scan
-  useEffect(() => {
-    if (!scanLoading && heatmapData && authUser && loadMissions) {
-      console.log('🎯 Scan completed, loading missions for user...');
-      const timer = setTimeout(async () => {
-        try {
-          const loadedMissions = await loadMissions();
-          console.log(`✅ ${loadedMissions.length} missions loaded!`);
-        } catch (error) {
-          console.error('❌ Failed to load missions:', error);
+      if (needsLoginScan === 'true' && !loginScanStarted.current) {
+        console.log('🚀 Login-Scan startet...')
+        loginScanStarted.current = true;
+        normalLoadDone.current = true; // Missions werden unten manuell geladen
+        // Lade vorhandene Missionen sofort, bevor der Backend-Scan fertig ist
+        loadMissions();
+        
+        // GPS-Position holen
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              try {
+                const { latitude, longitude } = position.coords;
+                console.log(`📍 GPS: ${latitude}, ${longitude}`);
+                
+                // Backend Login-Scan aufrufen
+                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                const response = await fetch(
+                  `${apiUrl}/api/v1/scan-on-login?user_id=${authUser.id}&latitude=${latitude}&longitude=${longitude}&radius_m=500`,
+                  { method: 'POST' }
+                );
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('✅ Login-Scan completed:', result);
+                } else {
+                  console.error('❌ Login-Scan failed:', response.status);
+                }
+                
+                // Flag entfernen
+                sessionStorage.removeItem('needsLoginScan');
+                loginScanStarted.current = false;
+                
+                // Missionen laden
+                const missionsAfterScan = await loadMissions();
+                console.log(`✅ ${missionsAfterScan.length} missions loaded after login scan!`);
+                
+              } catch (error) {
+                console.error('❌ Login-Scan error:', error);
+                sessionStorage.removeItem('needsLoginScan');
+                loginScanStarted.current = false;
+                loadMissions(); // Versuche dennoch Missionen zu laden
+              }
+            },
+            (error) => {
+              console.error('❌ GPS error:', error);
+              sessionStorage.removeItem('needsLoginScan');
+              loginScanStarted.current = false;
+              loadMissions(); // Lade Missionen trotzdem
+            }
+          );
+        } else {
+          console.error('❌ Geolocation not supported');
+          sessionStorage.removeItem('needsLoginScan');
+          loginScanStarted.current = false;
+          loadMissions();
         }
-      }, 500);
-      
-      return () => clearTimeout(timer);
+      } else {
+        // Kein Login-Scan, lade Missionen nur einmal beim normalen Seitenwechsel
+        if (!normalLoadDone.current && !missionsLoading) {
+          console.log('📋 Loading missions (no login-scan)...')
+          normalLoadDone.current = true;
+          loadMissions();
+        }
+      }
     }
-  }, [heatmapData, scanLoading, authUser, loadMissions]);
+  }, [authUser, loading, navigate, loadMissions]);
 
   const handleMissionClick = (mission: any) => {
     setActiveMission(mission);
@@ -83,8 +123,8 @@ const MapView = () => {
         animate={{ y: 0 }}
         className="absolute top-0 left-0 right-0 z-[1000] bg-gradient-to-b from-card/95 to-transparent backdrop-blur-sm p-4"
       >
-        <div className="flex items-center justify-between max-w-2xl mx-auto">
-          <div>
+        <div className="flex items-center justify-center max-w-2xl mx-auto">
+          <div className="text-center">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-heat via-primary to-cool-intense bg-clip-text text-transparent">
               HeatQuest
             </h1>
@@ -92,86 +132,8 @@ const MapView = () => {
               {loading ? "Loading..." : `Hello, ${authUser?.user_metadata?.user_name || authUser?.email?.split('@')[0] || user?.username}! 👋`}
             </p>
           </div>
-          <Button
-            onClick={() => navigate("/analyze")}
-            disabled={scanLoading}
-            className="rounded-2xl bg-gradient-to-r from-heat to-primary hover:from-heat-intense hover:to-heat shadow-lg"
-          >
-            <Camera className="w-5 h-5 mr-2" />
-            Analyze
-          </Button>
         </div>
       </motion.div>
-
-      {/* Loading Indicator */}
-      {scanLoading && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute top-24 left-4 right-4 z-[999] max-w-md"
-        >
-          <Card className="p-4 bg-card/95 backdrop-blur-sm">
-            <div className="flex items-center space-x-3">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <div>
-                <h3 className="font-bold">Analyzing Area...</h3>
-                <p className="text-sm text-muted-foreground">
-                  Checking if this area was already scanned
-                </p>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* Heatmap Data Display */}
-      {!scanLoading && heatmapData && (() => {
-        // Berechne Statistiken aus Grid Cells
-        const hotspots = heatmapData.grid_cells.filter(c => c.is_hotspot);
-        const avgTemp = heatmapData.grid_cells.reduce((sum, c) => sum + c.temp, 0) / heatmapData.grid_cells.length;
-        const avgNdvi = heatmapData.grid_cells.reduce((sum, c) => sum + c.ndvi, 0) / heatmapData.grid_cells.length;
-        const openMissions = missions.filter(m => !m.completed);
-        
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute top-24 left-4 right-4 z-[999] max-w-md"
-          >
-            <Card className="p-4 bg-card/95 backdrop-blur-sm">
-              <h3 className="font-bold mb-2">Area Analysis 🔥</h3>
-              <div className="text-sm space-y-1">
-                <p>📊 Total Cells: {heatmapData.total_cells}</p>
-                <p>🔥 Hotspots: {hotspots.length}</p>
-                <p>🌡️ Avg Temp: {avgTemp.toFixed(1)}°C</p>
-                <p>🌿 Avg NDVI: {avgNdvi.toFixed(2)}</p>
-                <p>
-                  {heatmapData.from_cache ? (
-                    <span className="text-green-500">⚡ Previously scanned area</span>
-                  ) : (
-                    <span className="text-blue-500">🆕 Newly scanned area</span>
-                  )}
-                </p>
-                {heatmapData.parent_cell_info && (
-                  <p className="text-xs text-muted-foreground">
-                    📍 Scanned {heatmapData.parent_cell_info.total_scans} time(s) by community
-                  </p>
-                )}
-                {missionsLoading ? (
-                  <p className="text-blue-500 flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading missions...
-                  </p>
-                ) : openMissions.length > 0 ? (
-                  <p className="text-green-500">🎯 {openMissions.length} mission(s) available nearby!</p>
-                ) : (
-                  <p className="text-muted-foreground">✨ No missions in this area yet</p>
-                )}
-              </div>
-            </Card>
-          </motion.div>
-        );
-      })()}
 
       {/* Map Area */}
       {mapboxToken ? (

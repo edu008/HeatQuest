@@ -7,8 +7,8 @@ const BottomNav = () => {
 
   const navItems = [
     { icon: Map, label: "Map", path: "/map" },
-    { icon: Trophy, label: "Rangliste", path: "/leaderboard" },
-    { icon: User, label: "Profil", path: "/profile" },
+    { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
+    { icon: User, label: "Profile", path: "/profile" },
   ];
 
   return (

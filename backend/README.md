@@ -22,6 +22,7 @@ MAP=pk.eyJ1IjoieW91ci10b2tlbiIsImEiOiJja...
 # Supabase (Required for database)
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key  # Backend write access (RLS bypass)
 
 # AWS (Optional - Landsat/Sentinel data is public)
 AWS_REGION=us-west-2
@@ -71,9 +72,9 @@ GET /api/v1/grid-heat-score-radius?lat=51.5323&lon=-0.0531&radius_m=500&cell_siz
 - `cell_size_m`: Grid cell size (default: 30m, Landsat resolution)
 
 **Returns:** JSON with grid cells containing:
-- `temp`: Temperature in °C
-- `ndvi`: Vegetation index
-- `heat_score`: Combined heat risk score
+- `temp`: Surface temperature in °C
+- `ndvi`: Vegetation index (Sentinel-2)
+- `heat_score`: Dynamic heat risk score (`temp_celsius - 0.3 × NDVI`)
 
 **Visualization:**
 ```bash
@@ -117,6 +118,33 @@ GET /api/v1/describe-location?lat=51.5074&lon=-0.1278&zoom=17
 
 ---
 
+### 3. **Login Scan API** – Mission Kickoff
+
+Trigger the automatic hotspot analysis and mission generation after login:
+
+```bash
+POST /api/v1/scan-on-login?user_id={uuid}&latitude=46.95&longitude=7.49&radius_m=500
+```
+
+**Highlights:**
+- Tageslimit: maximal **2** KI-Analysen pro User und Tag (`today_analyses_count`)
+- Nutzt vorhandene Child-Cells; führt nur bei Bedarf neue Scans durch
+- Übergibt Hotspots an AI + Missions-Service und setzt `mission_generated=True`
+- Frontend lädt Missionen direkt anschließend aus Supabase
+
+**Response (Beispiel):**
+```json
+{
+  "success": true,
+  "today_analyses_count": 1,
+  "max_daily_analyses": 2,
+  "new_missions_generated": 2,
+  "ai_analysis_performed": true
+}
+```
+
+---
+
 ## 🛠️ Tech Stack
 
 | Component | Technology | Purpose |
@@ -147,6 +175,7 @@ backend/
 │   │   ├── sentinel_service.py          # NDVI vegetation data
 │   │   ├── stac_service.py              # Satellite scene search
 │   │   ├── parent_cell_service.py       # Smart caching system
+│   │   ├── hotspot_detector.py          # Dynamic hotspot detection
 │   │   ├── location_description_service.py  # AI image analysis
 │   │   ├── mission_generation_service.py    # Auto-mission creation
 │   │   └── visualization_service.py     # PNG heatmap generation
@@ -178,7 +207,7 @@ backend/
 
 **Main Functions:**
 - `generate_grid_cells(center_lat, center_lon, radius_m, cell_size_m)` - Creates grid of cells around a point
-- `calculate_heat_score(temperature, ndvi)` - Computes heat risk: `temp - (0.3 × NDVI) - 15`
+- `calculate_heat_score(temperature, ndvi)` - Computes heat risk: `temp - (0.3 × NDVI)`
 - `assign_to_parent_cell(lat, lon)` - Maps coordinates to parent cell (5km grid)
 
 **Use Case:** Called by heatmap API to create analysis grid
@@ -235,9 +264,9 @@ backend/
 3. **Caching** - Once analyzed, data persists in Supabase
 
 **Main Functions:**
-- `find_or_create_parent_cell(lat, lon)` - Gets/creates 5km parent cell
-- `get_cached_child_cells(parent_cell_id)` - Retrieves analyzed cells
-- `should_analyze_cell(heat_score)` - Decides if cell needs AI analysis
+- `find_existing_parent_cell(lat, lon)` - Holt 5 km Parent-Cell aus dem Cache
+- `save_child_cells(parent_cell_id, grid_cells)` - Persistiert Grid und markiert Hotspots via `HotspotDetector`
+- `load_child_cells(parent_cell_id)` - Liefert Child-Cells inkl. `is_hotspot`/`analyzed` Flags
 
 **Database Tables:**
 - `parent_cells` - 5km grid cache
@@ -246,7 +275,22 @@ backend/
 
 ---
 
-#### 6. **location_description_service.py** - AI Image Analysis
+#### 6. **hotspot_detector.py** - Dynamic Hotspot Detection
+**Purpose:** Wählt automatisch die relevantesten Hotspots für KI-Analyse.
+
+**Methoden:**
+- `detect_by_percentile` – markiert die heißesten X % (Standard: 5 %)
+- `detect_by_stddev` – nutzt Standardabweichung für stark variierende Daten
+- `detect_auto` – Adaptive Wahl anhand des Variationskoeffizienten
+- `detect_by_color` – optional: Hotspot-Auswahl anhand Rot-Anteil der Heatmap
+
+**Einsatzorte:**
+- `parent_cell_service.save_child_cells` markiert `is_hotspot`/`analyzed`
+- `heatmap.analyze_hotspot_cells_with_ai` priorisiert zu untersuchende Zellen
+
+---
+
+#### 7. **location_description_service.py** - AI Image Analysis
 **Purpose:** Analyzes satellite images with multiple AI providers
 
 **Supported AI Providers:**
@@ -267,30 +311,24 @@ backend/
 
 ---
 
-#### 7. **mission_generation_service.py** - Auto-Mission Creation
-**Purpose:** Automatically creates missions from hotspot detection
+#### 8. **mission_generation_service.py** - Auto-Mission Creation
+**Purpose:** Creates missions from analyzed hotspot cells with dynamic thresholds.
 
 **Workflow:**
-1. User scans location → Hotspots detected (heat_score > 15)
-2. AI analyzes hotspot → Gets description + actions
-3. Service creates mission → Saves to Supabase
-4. Mission appears on map → User can accept
+1. `scan-on-login` führt täglich max. 2 KI-Analysen auf den heißesten Zellen durch.
+2. Analysen mit `heat_score ≥ 11` und `mission_generated=False` werden berücksichtigt.
+3. Für jede Analyse entsteht genau eine Mission (Flag wird danach auf `True` gesetzt).
+4. Missionen landen in Supabase und werden direkt im Frontend angezeigt.
 
 **Main Functions:**
-- `generate_mission_from_analysis(cell_analysis, user_id)` - Creates mission
-- `_generate_mission_title(analysis)` - Smart title based on location type
-- `_generate_mission_description(analysis)` - Uses AI summary
-- `_generate_mission_reasons(analysis)` - Heat stress causes
-- `_generate_suggested_actions(analysis)` - Actionable steps
-
-**Mission Types:**
-- `auto_generated` - From hotspot analysis
-- `user_discovered` - User-submitted
-- `community` - Shared missions
+- `generate_missions_from_analyses(parent_cell_id, user_id, …)` – Hauptpipeline
+- `_create_mission_from_analysis(analysis, user_id)` – erstellt Mission + schreibt `mission_generated=True`
+- `_generate_mission_title_advanced(...)` / `_generate_mission_description(...)` – nutzt AI-Summary und Ursachen
+- `_calculate_distance(...)` – sortiert Missionen nach Entfernung zum User
 
 ---
 
-#### 8. **visualization_service.py** - Heatmap PNG Generation
+#### 9. **visualization_service.py** - Heatmap PNG Generation
 **Purpose:** Creates visual heatmap images for download/sharing
 
 **Main Functions:**
@@ -304,7 +342,7 @@ backend/
 
 ### Core Modules
 
-#### 9. **supabase_client.py** - Database Connection
+#### 10. **supabase_client.py** - Database Connection
 **Purpose:** Manages PostgreSQL database connection via Supabase
 
 **Features:**
@@ -321,7 +359,7 @@ backend/
 
 ---
 
-#### 10. **aws_client.py** - AWS S3 Access
+#### 11. **aws_client.py** - AWS S3 Access
 **Purpose:** Connects to AWS for Landsat/Sentinel data
 
 **Features:**
@@ -366,16 +404,16 @@ User Opens Map
 4. For each cell:
     ├─ Landsat Service → Get temperature
     ├─ Sentinel Service → Get NDVI
-    └─ Calculate heat_score = temp - (0.3 × NDVI) - 15
+    └─ Calculate heat_score = temp - (0.3 × NDVI)
     ↓
-5. Identify hotspots (heat_score > 15)
+5. `HotspotDetector` markiert die heißesten ~5 % Zellen (Adaptive: Percentile oder StdDev)
     ↓
-6. For top 3 hotspots (not yet analyzed):
-    ├─ Location Description Service → AI analyzes satellite image
-    ├─ Mission Generation Service → Creates mission
-    └─ Save to database (cell_analyses, missions)
+6. `scan-on-login` führt pro Tag max. 2 KI-Analysen auf nicht analysierten Hotspots aus:
+    ├─ Location Description Service → AI beschreibt die Zelle
+    ├─ Mission Generation Service → Erstellt Mission (setzt `mission_generated=True`)
+    └─ Speichert Ergebnisse (child_cells, cell_analyses, missions)
     ↓
-7. Return heatmap + auto-generated missions
+7. Backend liefert Heatmap + aktualisierte Missionsdaten
     ↓
 Frontend displays map with mission markers
 ```

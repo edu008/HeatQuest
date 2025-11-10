@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useGame } from "@/contexts/GameContext";
 import { ArrowLeft, MapPin } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
 
 const MissionDetail = () => {
   const { id } = useParams();
@@ -36,30 +35,22 @@ const MissionDetail = () => {
 
   const handleComplete = () => {
     if (checkedActions.size === 0) {
-      toast({
-        title: "Bitte wähle mindestens eine Aktion aus!",
-        variant: "destructive",
-      });
       return;
     }
 
     completeMission(mission.id);
-    toast({
-      title: "Mission abgeschlossen! 🎉",
-      description: "+100 XP",
-    });
     navigate("/profile");
   };
 
   const allActionsChecked = checkedActions.size === mission.actions.length;
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <motion.div
         initial={{ y: -50 }}
         animate={{ y: 0 }}
-        className="sticky top-0 z-10 bg-gradient-to-r from-heat via-primary to-cool-intense p-4"
+        className="bg-gradient-to-r from-heat via-primary to-cool-intense p-6 pb-12"
       >
         <div className="max-w-2xl mx-auto">
           <Button
@@ -72,15 +63,11 @@ const MissionDetail = () => {
           </Button>
           <div className="text-white">
             <h1 className="text-2xl font-bold">{mission.title}</h1>
-            <p className="text-white/90 flex items-center gap-2 mt-1">
-              <MapPin className="w-4 h-4" />
-              {mission.description}
-            </p>
           </div>
         </div>
       </motion.div>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-6 -mt-8">
+      <div className="max-w-2xl mx-auto px-4 -mt-6 space-y-4">
         {/* Heat Risk Card */}
         <Card className="p-6 rounded-3xl bg-card/95 backdrop-blur-sm shadow-xl">
           <h2 className="font-semibold mb-3">Heat Risk Level</h2>
@@ -99,7 +86,7 @@ const MissionDetail = () => {
 
         {/* Reasons */}
         <Card className="p-6 rounded-3xl">
-          <h2 className="font-semibold mb-3">Warum ist es hier heiß? 🔥</h2>
+          <h2 className="font-semibold mb-3">Why is it so hot here? 🔥</h2>
           <ul className="space-y-3">
             {mission.reasons.map((reason, i) => (
               <motion.li
@@ -118,25 +105,51 @@ const MissionDetail = () => {
 
         {/* Actions Checklist */}
         <Card className="p-6 rounded-3xl">
-          <h2 className="font-semibold mb-3">Deine Aktionen ✅</h2>
+          <h2 className="font-semibold mb-3">Your Actions ✅</h2>
           <div className="space-y-3">
-            {mission.actions.map((action, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl hover:bg-muted transition-colors cursor-pointer"
-                onClick={() => toggleAction(i)}
-              >
-                <Checkbox
-                  checked={checkedActions.has(i)}
-                  onCheckedChange={() => toggleAction(i)}
-                  className="mt-1"
-                />
-                <span className="flex-1 text-sm">{action}</span>
-              </motion.div>
-            ))}
+            {mission.actions.map((action, i) => {
+              // Handle both string and object format for backwards compatibility
+              const actionText = typeof action === 'string' ? action : action.action;
+              const actionDescription = typeof action === 'object' && action.description ? action.description : '';
+              const actionPriority = typeof action === 'object' && action.priority ? action.priority : 'medium';
+              
+              // Priority badge colors
+              const priorityColors = {
+                high: 'bg-red-500/20 text-red-600 border-red-500/30',
+                medium: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30',
+                low: 'bg-blue-500/20 text-blue-600 border-blue-500/30'
+              };
+              
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-start gap-3 p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors cursor-pointer border border-transparent hover:border-primary/20"
+                  onClick={() => toggleAction(i)}
+                >
+                  <Checkbox
+                    checked={checkedActions.has(i)}
+                    onCheckedChange={() => toggleAction(i)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{actionText}</span>
+                      {typeof action === 'object' && action.priority && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityColors[actionPriority as keyof typeof priorityColors]}`}>
+                          {actionPriority}
+                        </span>
+                      )}
+                    </div>
+                    {actionDescription && (
+                      <p className="text-xs text-muted-foreground">{actionDescription}</p>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </Card>
 
@@ -147,11 +160,11 @@ const MissionDetail = () => {
           className="w-full h-14 text-lg rounded-2xl bg-gradient-to-r from-heat via-primary to-cool-intense hover:shadow-xl transition-all"
         >
           {mission.completed ? (
-            "✅ Mission abgeschlossen"
+            "✅ Mission Completed"
           ) : allActionsChecked ? (
-            "🎉 Mission abschließen (+100 XP)"
+            "🎉 Complete Mission (+100 XP)"
           ) : (
-            `Mission abschließen (${checkedActions.size}/${mission.actions.length})`
+            `Complete Mission (${checkedActions.size}/${mission.actions.length})`
           )}
         </Button>
       </div>

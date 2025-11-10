@@ -22,6 +22,8 @@ const Login = () => {
     setLoading(true);
     try {
       await signIn(email, password);
+      // Setze Flag: Login-Scan benötigt
+      sessionStorage.setItem('needsLoginScan', 'true');
       navigate("/map");
     } catch (error) {
       console.error("Login failed:", error);
@@ -36,6 +38,8 @@ const Login = () => {
     setLoading(true);
     try {
       await signUp(email, password, registerUsername);
+      // Setze Flag: Login-Scan benötigt
+      sessionStorage.setItem('needsLoginScan', 'true');
       navigate("/map");
     } catch (error) {
       console.error("Registration failed:", error);

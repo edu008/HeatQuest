@@ -6,6 +6,12 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
+export interface MissionAction {
+  action: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
 export interface Mission {
   id: string;
   title: string;
@@ -14,7 +20,7 @@ export interface Mission {
   lng: number;
   heatRisk: number;
   reasons: string[];
-  actions: string[];
+  actions: (string | MissionAction)[]; // Support both old string format and new object format
   completed: boolean;
   imageUrl?: string;
   distance_to_user?: number;

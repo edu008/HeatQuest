@@ -6,6 +6,7 @@ import math
 import logging
 from typing import Optional, Dict, List, Tuple
 from app.core.supabase_client import supabase_service
+from app.services.hotspot_detector import hotspot_detector
 
 logger = logging.getLogger(__name__)
 
@@ -247,14 +248,33 @@ class ParentCellService:
         try:
             logger.info(f"💾 Speichere {len(grid_cells)} Child-Cells...")
             
+            # Dynamische Hotspot-Erkennung für neue Child-Cells
+            detection_input = [
+                {'cell_id': cell.cell_id, 'heat_score': cell.heat_score}
+                for cell in grid_cells
+            ]
+
+            hotspot_cells, threshold_info = hotspot_detector.detect_auto(
+                detection_input,
+                method="adaptive"
+            )
+            hotspot_ids = {c['cell_id'] for c in hotspot_cells}
+
+            logger.info(
+                "🔥 Dynamic hotspot marking: %d/%d Zellen benötigen Analyse",
+                len(hotspot_ids),
+                len(grid_cells)
+            )
+            if isinstance(threshold_info, (int, float)):
+                logger.info("   Threshold: %.2f", threshold_info)
+            else:
+                logger.info("   Threshold info: %s", threshold_info)
+
             # Konvertiere zu DB-Format
             child_cells_data = []
             for cell in grid_cells:
-                # WICHTIG: 'analyzed' bedeutet "muss noch analysiert werden"
-                # - analyzed = True → Zelle mit Heat Score >= 11, wartet auf KI-Analyse
-                # - analyzed = False → Zelle wurde bereits analysiert ODER Heat Score < 11
-                needs_analysis = cell.heat_score >= 11.0 if cell.heat_score else False
-                
+                needs_analysis = cell.cell_id in hotspot_ids
+
                 child_data = {
                     'parent_cell_id': parent_cell_id,
                     'cell_id': cell.cell_id,
@@ -269,8 +289,8 @@ class ParentCellService:
                     'heat_score': cell.heat_score,
                     'cell_size_m': 30,  # TODO: Dynamisch
                     'pixel_count': cell.pixel_count,
-                    'is_hotspot': cell.heat_score > 28 if cell.heat_score else False,
-                    'analyzed': needs_analysis  # ✅ True wenn Heat Score >= 11 (muss analysiert werden)
+                    'is_hotspot': needs_analysis,
+                    'analyzed': needs_analysis  # ✅ True → wartet auf Analyse
                 }
                 child_cells_data.append(child_data)
             
@@ -283,7 +303,7 @@ class ParentCellService:
             cells_to_analyze = sum(1 for c in child_cells_data if c.get('analyzed') == True)
             logger.info(f"✅ {len(saved_cells)} Child-Cells gespeichert!")
             if cells_to_analyze > 0:
-                logger.info(f"   🔄 {cells_to_analyze} Zellen warten auf KI-Analyse (Heat Score >= 11.0)")
+                logger.info(f"   🔄 {cells_to_analyze} Zellen warten auf KI-Analyse (dynamischer Threshold)")
             
             # Trigger updatet automatisch Parent-Cell-Stats
             

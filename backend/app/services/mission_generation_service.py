@@ -314,30 +314,15 @@ class MissionGenerationService:
         return f"{emoji} {prefix}: {location_type}"
     
     def _generate_mission_description(self, analysis: Dict) -> str:
-        """Generiert detaillierte Mission-Beschreibung."""
-        ai_summary = analysis.get('ai_summary', '')
-        heat_score = analysis.get('heat_score', 0)
-        temperature = analysis.get('temperature')
+        """Generiert Mission-Beschreibung aus main_cause."""
+        main_cause = analysis.get('main_cause', '')
         
-        # Basis-Beschreibung
-        description_parts = []
+        # Verwende main_cause als Beschreibung
+        if main_cause:
+            return main_cause
         
-        if ai_summary:
-            description_parts.append(ai_summary)
-        
-        # Füge Heat Score Details hinzu
-        if heat_score > 30:
-            description_parts.append(f"⚠️ Kritischer Heat Score von {heat_score:.1f} - sofortiges Handeln erforderlich!")
-        elif heat_score > 20:
-            description_parts.append(f"⚠️ Hoher Heat Score von {heat_score:.1f} - Maßnahmen dringend empfohlen.")
-        else:
-            description_parts.append(f"Heat Score: {heat_score:.1f}")
-        
-        # Füge Temperatur hinzu wenn vorhanden
-        if temperature:
-            description_parts.append(f"🌡️ Oberflächentemperatur: {temperature:.1f}°C")
-        
-        return " ".join(description_parts)
+        # Fallback falls kein main_cause vorhanden
+        return "Hitze-Hotspot identifiziert"
     
     def _generate_mission_reasons(self, analysis: Dict) -> List[str]:
         """Generiert Liste von Gründen für die Hitze."""

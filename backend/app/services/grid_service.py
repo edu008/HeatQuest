@@ -11,6 +11,7 @@ OPTIMIERT mit BATCH-PROCESSING:
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 import logging
+from math import cos, radians
 from shapely.geometry import Polygon, mapping
 from rasterstats import zonal_stats
 import rasterio
@@ -98,6 +99,66 @@ class GridService:
         logger.info(f"✅ Grid erstellt: {len(grid_cells)} Zellen ({len(lat_steps)}×{len(lon_steps)})")
         
         return grid_cells
+
+    def calculate_grid_bounds(
+        self,
+        center_lat: float,
+        center_lon: float,
+        radius_m: float
+    ) -> Tuple[float, float, float, float]:
+        """
+        Berechnet eine Bounding Box um einen Mittelpunkt und Radius in Metern.
+
+        Args:
+            center_lat: Mittelpunkt (Breitengrad)
+            center_lon: Mittelpunkt (Längengrad)
+            radius_m: Radius in Metern
+
+        Returns:
+            Tuple: (lat_min, lat_max, lon_min, lon_max)
+        """
+        if radius_m <= 0:
+            raise ValueError("radius_m muss größer als 0 sein")
+
+        meters_per_degree_lat = 111_320.0
+        lat_delta = radius_m / meters_per_degree_lat
+
+        cos_lat = cos(radians(center_lat))
+        if abs(cos_lat) < 1e-6:
+            cos_lat = 1e-6
+        meters_per_degree_lon = 111_320.0 * cos_lat
+        lon_delta = radius_m / meters_per_degree_lon
+
+        lat_min = center_lat - lat_delta
+        lat_max = center_lat + lat_delta
+        lon_min = center_lon - lon_delta
+        lon_max = center_lon + lon_delta
+
+        logger.info(
+            f"📦 Grid Bounds: lat[{lat_min:.6f}, {lat_max:.6f}] "
+            f"lon[{lon_min:.6f}, {lon_max:.6f}] (Radius {radius_m}m)"
+        )
+
+        return lat_min, lat_max, lon_min, lon_max
+
+    def create_lat_lon_grid(
+        self,
+        lat_min: float,
+        lat_max: float,
+        lon_min: float,
+        lon_max: float,
+        cell_size_m: float = 200
+    ) -> List[Dict]:
+        """
+        Wrapper für generate_grid zur besseren Lesbarkeit in Aufrufern.
+        """
+        return self.generate_grid(
+            lat_min=lat_min,
+            lat_max=lat_max,
+            lon_min=lon_min,
+            lon_max=lon_max,
+            cell_size_m=cell_size_m
+        )
     
     def calculate_grid_heat_scores(
         self,

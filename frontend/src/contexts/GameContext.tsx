@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useMissions, Mission as MissionType } from "../hooks/useMissions";
+import { useMissions, Mission as MissionType, MissionAction } from "../hooks/useMissions";
 
 export type Mission = MissionType;
+export type { MissionAction };
 
 export interface UserProfile {
   username: string;

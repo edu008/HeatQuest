@@ -146,17 +146,27 @@ async def get_user_missions(
         # Konvertiere zu Frontend-Format
         missions = []
         for mission in missions_raw:
-            # Extrahiere Actions aus required_actions JSONB
-            actions_text = []
+            # Extrahiere vollständige Actions mit Details aus required_actions JSONB
+            actions_detailed = []
             required_actions = mission.get('required_actions', [])
             if isinstance(required_actions, list):
                 for action in required_actions:
                     if isinstance(action, dict):
-                        actions_text.append(action.get('action', ''))
+                        actions_detailed.append({
+                            'action': action.get('action', ''),
+                            'description': action.get('description', ''),
+                            'priority': action.get('priority', 'medium')
+                        })
             
             # Fallback
-            if not actions_text:
-                actions_text = ["Analyze area", "Document findings"]
+            if not actions_detailed:
+                actions_detailed = [
+                    {
+                        'action': 'Analyze area',
+                        'description': 'Document the current heat conditions',
+                        'priority': 'high'
+                    }
+                ]
             
             # Reasons (aus Main Cause oder Analysis)
             reasons = []
@@ -173,7 +183,7 @@ async def get_user_missions(
                 "lng": mission['longitude'],
                 "heatRisk": mission.get('heat_risk_score', 0),
                 "reasons": reasons,
-                "actions": actions_text,
+                "actions": actions_detailed,  # Vollständige Action-Objekte mit description & priority
                 "completed": mission['status'] == 'completed',
                 "imageUrl": None,
                 # Additional fields
@@ -241,12 +251,23 @@ async def get_mission(mission_id: str):
         mission = response.data
         
         # Konvertiere zu Frontend-Format (wie oben)
-        actions_text = []
+        actions_detailed = []
         required_actions = mission.get('required_actions', [])
         if isinstance(required_actions, list):
             for action in required_actions:
                 if isinstance(action, dict):
-                    actions_text.append(action.get('action', ''))
+                    actions_detailed.append({
+                        'action': action.get('action', ''),
+                        'description': action.get('description', ''),
+                        'priority': action.get('priority', 'medium')
+                    })
+        
+        if not actions_detailed:
+            actions_detailed = [{
+                'action': 'Analyze area',
+                'description': 'Document the current heat conditions',
+                'priority': 'high'
+            }]
         
         reasons = []
         if mission.get('description'):
@@ -261,7 +282,7 @@ async def get_mission(mission_id: str):
             "lng": mission['longitude'],
             "heatRisk": mission.get('heat_risk_score', 0),
             "reasons": reasons,
-            "actions": actions_text,
+            "actions": actions_detailed,  # Vollständige Action-Objekte
             "completed": mission['status'] == 'completed',
             "imageUrl": None,
             "parent_cell_id": mission.get('parent_cell_id'),
@@ -519,6 +540,262 @@ async def cleanup_duplicate_analyses():
         raise HTTPException(
             status_code=500,
             detail=f"Error: {str(e)}"
+        )
+
+
+@router.post(
+    "/missions/{mission_id}/claim",
+    summary="Mission reservieren",
+    description="Reserviert eine Mission für einen User"
+)
+async def claim_mission(
+    mission_id: str,
+    user_id: str = Query(..., description="User ID")
+):
+    """
+    🎯 **MISSION RESERVIEREN**
+    
+    Reserviert eine Mission für einen User:
+    - Ändert Status von 'pending' zu 'active'
+    - Setzt assigned_user_id
+    - Andere User können diese Mission nicht mehr übernehmen
+    """
+    try:
+        logger.info(f"🎯 Claim Mission: {mission_id} by User {user_id}")
+        
+        # Prüfe ob Mission existiert und verfügbar ist
+        response = supabase_service.client.table('missions').select('*').eq('id', mission_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Mission not found")
+        
+        mission = response.data[0]
+        
+        # Prüfe ob Mission bereits reserviert ist
+        if mission.get('status') == 'active' and mission.get('assigned_user_id'):
+            if mission['assigned_user_id'] != user_id:
+                raise HTTPException(status_code=400, detail="Mission already claimed by another user")
+            else:
+                return JSONResponse(content={"success": True, "message": "Mission already claimed by you"})
+        
+        # Reserviere Mission
+        update_response = supabase_service.client.table('missions').update({
+            'status': 'active',
+            'assigned_user_id': user_id,
+            'updated_at': 'now()'
+        }).eq('id', mission_id).execute()
+        
+        logger.info(f"✅ Mission {mission_id} claimed by {user_id}")
+        
+        return JSONResponse(content={"success": True, "mission": update_response.data[0] if update_response.data else None})
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error claiming mission: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/missions/{mission_id}/complete-action",
+    summary="Action abschließen",
+    description="Schließt eine einzelne Action ab und vergibt Punkte"
+)
+async def complete_action(
+    mission_id: str,
+    user_id: str = Query(..., description="User ID"),
+    action_index: int = Query(..., description="Index der Action (0-based)")
+):
+    """
+    ✅ **ACTION ABSCHLIESSEN**
+    
+    Schließt eine einzelne Action ab:
+    - Markiert Action als completed
+    - Vergibt Punkte basierend auf Priorität:
+      - HIGH: 50 Punkte
+      - MEDIUM: 30 Punkte
+      - LOW: 20 Punkte
+    - Aktualisiert User-Profile
+    """
+    try:
+        logger.info(f"✅ Complete Action: Mission {mission_id}, User {user_id}, Action {action_index}")
+        
+        # Hole Mission
+        response = supabase_service.client.table('missions').select('*').eq('id', mission_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Mission not found")
+        
+        mission = response.data[0]
+        
+        # Prüfe ob User diese Mission beansprucht hat
+        if mission.get('assigned_user_id') != user_id:
+            raise HTTPException(status_code=403, detail="You don't own this mission")
+        
+        # Hole required_actions (JSONB)
+        required_actions = mission.get('required_actions', [])
+        
+        if action_index < 0 or action_index >= len(required_actions):
+            raise HTTPException(status_code=400, detail="Invalid action index")
+        
+        action = required_actions[action_index]
+        
+        # Prüfe ob bereits completed
+        if action.get('completed', False):
+            return JSONResponse(content={"success": True, "message": "Action already completed", "points_awarded": 0})
+        
+        # Markiere als completed
+        action['completed'] = True
+        required_actions[action_index] = action
+        
+        # Berechne Punkte
+        priority = action.get('priority', 'medium')
+        points_map = {'high': 50, 'medium': 30, 'low': 20}
+        points = points_map.get(priority, 20)
+        
+        # Update Mission
+        supabase_service.client.table('missions').update({
+            'required_actions': required_actions,
+            'updated_at': 'now()'
+        }).eq('id', mission_id).execute()
+        
+        # Update User Points
+        profile_response = supabase_service.client.table('profiles').select('points, level, missions_completed').eq('id', user_id).execute()
+        
+        if profile_response.data and len(profile_response.data) > 0:
+            current_points = profile_response.data[0].get('points', 0)
+            current_level = profile_response.data[0].get('level', 1)
+            current_missions_completed = profile_response.data[0].get('missions_completed', 0)
+            new_points = current_points + points
+            
+            # Level-Up Logik (500 Punkte pro Level)
+            new_level = (new_points // 500) + 1
+            
+            supabase_service.client.table('profiles').update({
+                'points': new_points,
+                'level': new_level
+            }).eq('id', user_id).execute()
+            
+            logger.info(f"✅ User {user_id}: +{points} points (Total: {new_points}, Level: {new_level})")
+        
+        # Prüfe ob alle Actions completed sind
+        all_completed = all(a.get('completed', False) for a in required_actions)
+        
+        if all_completed:
+            # Mission als completed markieren
+            supabase_service.client.table('missions').update({
+                'status': 'completed',
+                'completed_at': 'now()'
+            }).eq('id', mission_id).execute()
+            
+            # Update missions_completed counter
+            if profile_response.data and len(profile_response.data) > 0:
+                supabase_service.client.table('profiles').update({
+                    'missions_completed': current_missions_completed + 1
+                }).eq('id', user_id).execute()
+            
+            logger.info(f"🎉 Mission {mission_id} fully completed!")
+        
+        return JSONResponse(content={
+            "success": True,
+            "points_awarded": points,
+            "action_completed": True,
+            "mission_completed": all_completed
+        })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error completing action: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/missions/{mission_id}/release",
+    summary="Mission freigeben",
+    description="Gibt eine Mission frei, damit andere User sie übernehmen können"
+)
+async def release_mission(
+    mission_id: str,
+    user_id: str = Query(..., description="User ID")
+):
+    """
+    🔓 **MISSION FREIGEBEN**
+    
+    Gibt eine Mission frei:
+    - Setzt Status zurück auf 'pending'
+    - Entfernt assigned_user_id
+    - Andere User können Mission übernehmen
+    - Fortschritt bleibt erhalten (completed actions bleiben)
+    """
+    try:
+        logger.info(f"🔓 Release Mission: {mission_id} by User {user_id}")
+        
+        # Hole Mission
+        response = supabase_service.client.table('missions').select('*').eq('id', mission_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Mission not found")
+        
+        mission = response.data[0]
+        
+        # Prüfe ob User diese Mission besitzt
+        if mission.get('assigned_user_id') != user_id:
+            raise HTTPException(status_code=403, detail="You don't own this mission")
+        
+        # Gebe Mission frei
+        supabase_service.client.table('missions').update({
+            'status': 'pending',
+            'assigned_user_id': None,
+            'updated_at': 'now()'
+        }).eq('id', mission_id).execute()
+        
+        logger.info(f"✅ Mission {mission_id} released")
+        
+        return JSONResponse(content={"success": True, "message": "Mission released successfully"})
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error releasing mission: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/leaderboard",
+    summary="Leaderboard abrufen",
+    description="Gibt die Top 5 Spieler sortiert nach Punkten zurück"
+)
+async def get_leaderboard(limit: int = Query(5, description="Max. Anzahl Spieler", ge=1, le=5)):
+    """
+    🏆 **LEADERBOARD**
+    
+    Gibt die Top-Spieler sortiert nach Punkten zurück.
+    """
+    try:
+        logger.info(f"🏆 Get Leaderboard (limit: {limit})")
+        
+        # Hole Top-Spieler aus profiles Tabelle
+        response = supabase_service.client.table('profiles')\
+            .select('id, username, avatar_url, points, level, missions_completed')\
+            .order('points', desc=True)\
+            .limit(limit)\
+            .execute()
+        
+        leaderboard = response.data if response.data else []
+        
+        logger.info(f"✅ {len(leaderboard)} Spieler im Leaderboard")
+        
+        return JSONResponse(content={
+            "leaderboard": leaderboard,
+            "total_players": len(leaderboard)
+        })
+    
+    except Exception as e:
+        logger.error(f"❌ Fehler beim Abrufen des Leaderboards: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Fehler beim Abrufen des Leaderboards: {str(e)}"
         )
 
 

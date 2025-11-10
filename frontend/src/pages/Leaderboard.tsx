@@ -1,32 +1,45 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
-import { useGame } from "@/contexts/GameContext";
+import { useAuth } from "@/contexts/AuthContext";
 import BottomNav from "@/components/BottomNav";
 import { Trophy, Medal, Award } from "lucide-react";
 
-// Mock leaderboard data
-const mockPlayers = [
-  { username: "EcoWarrior", xp: 2500, level: 6, missions: 25 },
-  { username: "GreenHero", xp: 2100, level: 5, missions: 21 },
-  { username: "ClimateChamp", xp: 1800, level: 4, missions: 18 },
-  { username: "CoolCrusader", xp: 1500, level: 4, missions: 15 },
-  { username: "HeatHunter", xp: 1200, level: 3, missions: 12 },
-];
+interface LeaderboardPlayer {
+  id: string;
+  username: string;
+  avatar_url?: string;
+  points: number;
+  level: number;
+  missions_completed: number;
+}
 
 const Leaderboard = () => {
-  const { user } = useGame();
+  const { user: authUser, profile } = useAuth();
+  const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const allPlayers = user
-    ? [
-        ...mockPlayers,
-        {
-          username: user.username,
-          xp: user.xp,
-          level: user.level,
-          missions: user.completedMissions,
-        },
-      ].sort((a, b) => b.xp - a.xp)
-    : mockPlayers;
+  useEffect(() => {
+    loadLeaderboard();
+  }, []);
+
+  const loadLeaderboard = async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/leaderboard`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPlayers(data.leaderboard || []);
+      } else {
+        console.error('Failed to load leaderboard');
+      }
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getIcon = (rank: number) => {
     switch (rank) {
@@ -50,15 +63,24 @@ const Leaderboard = () => {
         className="bg-gradient-to-r from-heat via-primary to-cool-intense p-6"
       >
         <div className="max-w-2xl mx-auto text-white">
-          <h1 className="text-3xl font-bold mb-2">🏆 Rangliste</h1>
-          <p className="text-white/90">Die Top Climate Warriors</p>
+          <h1 className="text-3xl font-bold mb-2">🏆 Leaderboard</h1>
+          <p className="text-white/90">Top Climate Warriors</p>
         </div>
       </motion.div>
 
       <div className="max-w-2xl mx-auto p-4 space-y-4 -mt-8">
-        {allPlayers.map((player, index) => {
-          const rank = index + 1;
-          const isCurrentUser = player.username === user?.username;
+        {loading ? (
+          <Card className="p-8 rounded-3xl text-center">
+            <p className="text-muted-foreground">Loading leaderboard...</p>
+          </Card>
+        ) : players.length === 0 ? (
+          <Card className="p-8 rounded-3xl text-center">
+            <p className="text-muted-foreground">No players yet</p>
+          </Card>
+        ) : (
+          players.map((player, index) => {
+            const rank = index + 1;
+            const isCurrentUser = player.id === authUser?.id;
 
           return (
             <motion.div
@@ -81,9 +103,17 @@ const Leaderboard = () => {
                   </div>
 
                   {/* Avatar */}
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-heat to-primary flex items-center justify-center text-2xl">
-                    {isCurrentUser ? "👤" : "🧑"}
-                  </div>
+                  {player.avatar_url ? (
+                    <img 
+                      src={player.avatar_url} 
+                      alt={player.username}
+                      className="w-14 h-14 rounded-full border-2 border-primary/30"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-heat to-primary flex items-center justify-center text-2xl">
+                      {isCurrentUser ? "👤" : "🧑"}
+                    </div>
+                  )}
 
                   {/* Info */}
                   <div className="flex-1">
@@ -92,7 +122,7 @@ const Leaderboard = () => {
                         {player.username}
                         {isCurrentUser && (
                           <span className="ml-2 text-xs bg-primary text-white px-2 py-1 rounded-full">
-                            Du
+                            You
                           </span>
                         )}
                       </p>
@@ -100,22 +130,23 @@ const Leaderboard = () => {
                     <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                       <span>Level {player.level}</span>
                       <span>•</span>
-                      <span>{player.missions} Missionen</span>
+                      <span>{player.missions_completed} Missions</span>
                     </div>
                   </div>
 
-                  {/* XP */}
+                  {/* Points */}
                   <div className="text-right">
                     <p className="text-2xl font-bold text-primary">
-                      {player.xp}
+                      {player.points}
                     </p>
-                    <p className="text-xs text-muted-foreground">XP</p>
+                    <p className="text-xs text-muted-foreground">pts</p>
                   </div>
                 </div>
               </Card>
             </motion.div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       <BottomNav />

@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { locationService, UserLocation } from '@/services/locationService';
 import { heatmapService, HeatmapResponse } from '@/services/heatmapService';
-import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface HeatmapState {
@@ -25,7 +24,6 @@ export const useHeatmap = () => {
    */
   const scanCurrentLocation = useCallback(async (radius_m: number = 500) => {
     if (!user) {
-      toast.error('Please login first');
       return;
     }
 
@@ -37,7 +35,6 @@ export const useHeatmap = () => {
       const location = await locationService.getCurrentPosition();
       
       setState(prev => ({ ...prev, userLocation: location }));
-      toast.success(`Location found: ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`);
 
       // 2. Speichere Location
       const locationId = locationService.saveLocation(location, user.id);
@@ -45,9 +42,6 @@ export const useHeatmap = () => {
 
       // 3. Prüfe Parent Cell & Scanne (Backend macht beides automatisch!)
       console.log('🔍 Requesting heatmap (auto checks cache)...');
-      toast.loading('Analyzing area...', {
-        duration: 30000,
-      });
 
       const heatmapData = await heatmapService.getHeatmapForLocation({
         latitude: location.latitude,
@@ -67,22 +61,6 @@ export const useHeatmap = () => {
       // Markiere als gescannt
       locationService.markLocationScanned(locationId, user.id, heatmapData);
 
-      // Berechne Hotspots aus Grid Cells
-      const hotspotCount = heatmapData.grid_cells.filter(cell => cell.is_hotspot).length;
-      
-      // Unterschiedliche Messages je nach Cache
-      if (heatmapData.from_cache) {
-        toast.success(
-          `Found ${hotspotCount} hotspots! ⚡ (loaded from cache)`,
-          { duration: 3000 }
-        );
-      } else {
-        toast.success(
-          `Area scanned! Found ${hotspotCount} hotspots in ${heatmapData.total_cells} cells 🔥`,
-          { duration: 5000 }
-        );
-      }
-
       return heatmapData;
 
     } catch (error: any) {
@@ -95,7 +73,6 @@ export const useHeatmap = () => {
         error: errorMessage 
       }));
 
-      toast.error(errorMessage);
       throw error;
     }
   }, [user]);
@@ -109,7 +86,6 @@ export const useHeatmap = () => {
     radius_m: number = 500
   ) => {
     if (!user) {
-      toast.error('Please login first');
       return;
     }
 
@@ -119,7 +95,6 @@ export const useHeatmap = () => {
       console.log(`🌡️ Scanning coordinates: ${latitude}, ${longitude}`);
 
       // Request heatmap with user_id for mission generation
-      toast.loading('Scanning...', { duration: 30000 });
       const heatmapData = await heatmapService.getHeatmapForLocation({
         latitude,
         longitude,
@@ -134,7 +109,6 @@ export const useHeatmap = () => {
         data: heatmapData 
       }));
 
-      toast.success('Scan complete! 🔥');
       return heatmapData;
 
     } catch (error: any) {
@@ -144,7 +118,6 @@ export const useHeatmap = () => {
         loading: false, 
         error: error.message 
       }));
-      toast.error(error.message);
       throw error;
     }
   }, [user]);
