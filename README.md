@@ -81,6 +81,8 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 npm run dev
 ```
 
+ ##⏱️ First-run note: The backend analyzes all child cells in the selected area on the initial launch. This initial satellite data processing (heat score + AI) can take few minutes before missions appear. Thanks to the smart cache, subsequent scans run almost in real time.
+
 ### Access:
 - 🌐 **Frontend:** http://localhost:5173
 - 📡 **Backend API:** http://localhost:8000/docs
@@ -317,7 +319,7 @@ POST /api/v1/missions/complete
 ### Technical Features:
 - **Smart Caching System** - Parent/Child cells reduce API calls by 90%
 - **Real-time Satellite Data** - Landsat 8/9 for temperature, Sentinel-2 for NDVI
-- **Heat Score Algorithm:** `heat_score = temperature - (0.3 × NDVI) - 15`
+- **Heat Score Algorithm:** `heat_score = temperature - (0.3 × NDVI)`
 - **Multi-AI Provider Support** - Vertex AI, OpenAI, Google Gemini
 - **Automatic Mission Generation** - AI analyzes hotspots and creates actionable missions
 - **Database-backed** - Supabase PostgreSQL for users, missions, and analyses
