@@ -19,6 +19,12 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+# Reduziere httpx Logs (zu viele HTTP Request Details)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# Reduziere uvicorn Access-Logs (200 OK Meldungen)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # FastAPI-App initialisieren

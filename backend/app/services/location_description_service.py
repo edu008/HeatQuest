@@ -307,23 +307,23 @@ class LocationDescriptionService:
         Returns:
             Dictionary mit Beschreibung und Metadaten
         """
-        logger.info("=" * 70)
-        logger.info(f"🌍 Starte Location Description für ({lat}, {lon})")
-        logger.info(f"   Zoom: {zoom}, Größe: {width}x{height}px")
-        logger.info("=" * 70)
+        logger.debug("=" * 70)
+        logger.debug(f"🌍 Starte Location Description für ({lat}, {lon})")
+        logger.debug(f"   Zoom: {zoom}, Größe: {width}x{height}px")
+        logger.debug("=" * 70)
         
         # 1. Satellitenbild abrufen
-        logger.info("📥 Schritt 1/2: Satellitenbild abrufen...")
+        logger.debug("📥 Schritt 1/2: Satellitenbild abrufen...")
         image_path, provider = self._fetch_satellite_image(lat, lon, zoom, width, height)
-        logger.info(f"✅ Satellitenbild gespeichert: {image_path}")
-        logger.info(f"   Anbieter: {provider}")
+        logger.debug(f"✅ Satellitenbild gespeichert: {image_path}")
+        logger.debug(f"   Anbieter: {provider}")
         
         # 2. KI-Analyse durchführen
-        logger.info("🤖 Schritt 2/2: KI-Analyse durchführen...")
+        logger.debug("🤖 Schritt 2/2: KI-Analyse durchführen...")
         analysis_dict, ai_provider = self._analyze_image_with_ai(image_path)
-        logger.info(f"✅ KI-Analyse abgeschlossen!")
-        logger.info(f"   Anbieter: {ai_provider}")
-        logger.info(f"   Beschreibung ({len(analysis_dict['description'])} Zeichen): {analysis_dict['description'][:100]}...")
+        logger.debug(f"✅ KI-Analyse abgeschlossen!")
+        logger.debug(f"   Anbieter: {ai_provider}")
+        logger.debug(f"   Beschreibung ({len(analysis_dict['description'])} Zeichen): {analysis_dict['description'][:100]}...")
         
         result = {
             "description": analysis_dict["description"],
@@ -337,9 +337,9 @@ class LocationDescriptionService:
             "confidence": "high" if analysis_dict["description"] else "low"
         }
         
-        logger.info("=" * 70)
-        logger.info("✅ Location Description erfolgreich abgeschlossen!")
-        logger.info("=" * 70)
+        logger.debug("=" * 70)
+        logger.debug("✅ Location Description erfolgreich abgeschlossen!")
+        logger.debug("=" * 70)
         
         return result
     
@@ -407,7 +407,7 @@ class LocationDescriptionService:
             logger.debug("MAP (Mapbox Token) nicht konfiguriert")
             return False, "Mapbox"
         
-        logger.info("📡 Versuche Mapbox Static Images API...")
+        logger.debug("📡 Versuche Mapbox Static Images API...")
         
         # Mapbox Static Images API: Satellite-v9 Style
         url = (
@@ -423,7 +423,7 @@ class LocationDescriptionService:
         with open(output_path, 'wb') as f:
             f.write(response.content)
         
-        logger.info(f"✅ Mapbox: Bild abgerufen ({len(response.content)} bytes)")
+        logger.debug(f"✅ Mapbox: Bild abgerufen ({len(response.content)} bytes)")
         return True, "Mapbox Satellite"
     
     def _fetch_from_google_maps(
@@ -547,7 +547,7 @@ class LocationDescriptionService:
             logger.debug("Vertex AI Credentials nicht geladen")
             return {}, "Google Vertex AI"
         
-        logger.info("🤖 Versuche Google Vertex AI Vision...")
+        logger.debug("🤖 Versuche Google Vertex AI Vision...")
         
         # Generiere Access Token
         access_token = self._get_vertex_access_token()
@@ -613,7 +613,7 @@ class LocationDescriptionService:
             logger.error("❌ Kein verfügbares Gemini-Modell gefunden")
             return {}, "Google Vertex AI"
         
-        logger.info(f"   Verwende Modell: {model_name}")
+        logger.debug(f"   Verwende Modell: {model_name}")
         
         # Vertex AI Endpoint
         endpoint = (
@@ -641,7 +641,7 @@ class LocationDescriptionService:
                 raw_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
                 analysis_dict = self._parse_json_response(raw_text)
                 
-                logger.info(f"✅ Vertex AI: Analyse abgeschlossen mit {model_name}")
+                logger.debug(f"✅ Vertex AI: Analyse abgeschlossen mit {model_name}")
                 return analysis_dict, f"Google Vertex AI ({model_name})"
             
             else:

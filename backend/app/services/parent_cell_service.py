@@ -92,20 +92,20 @@ class ParentCellService:
             # Erstelle Key für diese Position
             cell_key = self.create_parent_cell_key(lat, lon)
             
-            logger.info(f"🔍 Suche Parent-Cell: {cell_key}")
+            logger.debug(f"🔍 Suche Parent-Cell: {cell_key}")
             
             # Suche in DB
             response = supabase_service.client.table('parent_cells').select('*').eq('cell_key', cell_key).execute()
             
             if response.data and len(response.data) > 0:
                 parent_cell = response.data[0]
-                logger.info(f"✅ Parent-Cell gefunden! ID: {parent_cell['id']}")
-                logger.info(f"   Gescannt: {parent_cell['total_scans']}x")
-                logger.info(f"   Child-Cells: {parent_cell['child_cells_count']}")
-                logger.info(f"   Letzter Scan: {parent_cell['last_scanned_at']}")
+                logger.debug(f"✅ Parent-Cell gefunden! ID: {parent_cell['id']}")
+                logger.debug(f"   Gescannt: {parent_cell['total_scans']}x")
+                logger.debug(f"   Child-Cells: {parent_cell['child_cells_count']}")
+                logger.debug(f"   Letzter Scan: {parent_cell['last_scanned_at']}")
                 return parent_cell
             else:
-                logger.info(f"❌ Keine Parent-Cell gefunden für {cell_key}")
+                logger.debug(f"❌ Keine Parent-Cell gefunden für {cell_key}")
                 return None
         
         except Exception as e:
@@ -204,7 +204,7 @@ class ParentCellService:
         """
         try:
             if only_hotspots:
-                logger.info(f"📥 Lade Hotspot-Cells (analyzed=True) für Parent {parent_cell_id}...")
+                logger.debug(f"📥 Lade Hotspot-Cells (analyzed=True) für Parent {parent_cell_id}...")
                 # ✅ BUG FIX #9: Lade nur Hotspots, verhindert Supabase 1000-Zeilen-Limit
                 response = supabase_service.client.table('child_cells')\
                     .select('*')\
@@ -212,7 +212,7 @@ class ParentCellService:
                     .eq('analyzed', True)\
                     .execute()
             else:
-                logger.info(f"📥 Lade alle Child-Cells für Parent {parent_cell_id}...")
+                logger.debug(f"📥 Lade alle Child-Cells für Parent {parent_cell_id}...")
                 # WARNUNG: Supabase gibt standardmäßig nur 1000 Zeilen zurück!
                 # Für große Parent-Cells (>1000 Zellen) könnte Pagination nötig sein
                 response = supabase_service.client.table('child_cells')\
@@ -222,23 +222,17 @@ class ParentCellService:
                     .execute()
             
             child_cells = response.data or []
-            logger.info(f"✅ {len(child_cells)} Child-Cells geladen")
+            logger.debug(f"✅ {len(child_cells)} Child-Cells geladen")
             
             # Debug: Prüfe ob 'analyzed' Feld vorhanden ist
             if child_cells:
-                first_cell = child_cells[0]
-                has_analyzed_field = 'analyzed' in first_cell
-                analyzed_value = first_cell.get('analyzed', 'FIELD_NOT_PRESENT')
-                logger.info(f"   Debug: 'analyzed' Feld vorhanden: {has_analyzed_field}, Wert: {analyzed_value}")
-                
-                # Zähle Status (analyzed = True bedeutet "muss noch analysiert werden")
                 needs_analysis_count = sum(1 for c in child_cells if c.get('analyzed') == True)
                 already_done_count = sum(1 for c in child_cells if c.get('analyzed') == False)
                 
                 if needs_analysis_count > 0:
-                    logger.info(f"   🔄 {needs_analysis_count} cells warten auf KI-Analyse (analyzed=True)")
+                    logger.debug(f"   🔄 {needs_analysis_count} cells warten auf KI-Analyse (analyzed=True)")
                 if already_done_count > 0:
-                    logger.info(f"   ✅ {already_done_count} cells bereits analysiert (analyzed=False)")
+                    logger.debug(f"   ✅ {already_done_count} cells bereits analysiert (analyzed=False)")
             
             return child_cells
         

@@ -205,7 +205,7 @@ async def get_user_missions(
         pending_count = sum(1 for m in missions if m['status'] in ['pending', 'active'])
         completed_count = sum(1 for m in missions if m['status'] == 'completed')
         
-        logger.info(f"✅ {total_count} Missionen abgerufen (Pending: {pending_count}, Completed: {completed_count})")
+        logger.info(f"✅ {total_count} Missions retrieved (Pending: {pending_count}, Completed: {completed_count})")
         
         return JSONResponse(content={
             "missions": missions,

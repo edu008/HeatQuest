@@ -20,6 +20,7 @@ from app.services.parent_cell_service import parent_cell_service
 from app.services.location_description_service import location_description_service
 from app.services.mission_generation_service import mission_generation_service
 from app.services.hotspot_detector import hotspot_detector
+from app.services.progress_tracker import ScanProgressTracker
 from app.core.supabase_client import supabase_service
 
 logger = logging.getLogger(__name__)
@@ -65,24 +66,24 @@ async def analyze_hotspot_cells_with_ai(
             logger.warning(f"⚠️ max_cells={max_cells} too high, capping at 10")
             max_cells = 10
 
-        logger.info("=" * 70)
+        logger.debug("=" * 70)
         if detection_method:
-            logger.info("🤖 AI ANALYSIS: Dynamic Hotspot Detection")
-            logger.info(f"   Method: {detection_method}")
+            logger.debug("🤖 AI ANALYSIS: Dynamic Hotspot Detection")
+            logger.debug(f"   Method: {detection_method}")
         else:
-            logger.info("🤖 AI ANALYSIS: Processing pre-flagged hotspot cells")
-        logger.info(
+            logger.debug("🤖 AI ANALYSIS: Processing pre-flagged hotspot cells")
+        logger.debug(
             "   Static Threshold: %s",
             f"{heat_score_threshold:.2f}" if heat_score_threshold is not None else "disabled",
         )
-        logger.info(f"   Max Cells: {max_cells}")
+        logger.debug(f"   Max Cells: {max_cells}")
 
         if not saved_cells:
-            logger.info("ℹ️  No cells available for analysis")
-            logger.info("=" * 70)
+            logger.debug("ℹ️  No cells available for analysis")
+            logger.debug("=" * 70)
             return
 
-        logger.info(f"📦 Total cells received: {len(saved_cells)}")
+        logger.debug(f"📦 Total cells received: {len(saved_cells)}")
 
         detection_params = detection_params or {}
 
@@ -116,46 +117,43 @@ async def analyze_hotspot_cells_with_ai(
                 cell for cell in saved_cells if cell.get("analyzed") is True
             ]
             threshold_info = "pre-flagged analyzed=True"
-            logger.info(f"📊 {len(hotspot_cells)} hotspot cells (pre-flagged)")
+            logger.debug(f"📊 {len(hotspot_cells)} hotspot cells (pre-flagged)")
 
         if not hotspot_cells:
-            logger.info("ℹ️  No hotspot cells detected")
-            logger.info("=" * 70)
+            logger.debug("ℹ️  No hotspot cells detected")
+            logger.debug("=" * 70)
             return
 
-        logger.info(f"📊 {len(hotspot_cells)} hotspot cells detected")
-        if isinstance(threshold_info, (int, float)):
-            logger.info(f"   Threshold info: {threshold_info:.2f}")
-        else:
-            logger.info(f"   Threshold info: {threshold_info}")
+        logger.debug(f"📊 {len(hotspot_cells)} hotspot cells detected")
+        logger.debug(f"   Threshold info: {threshold_info if not isinstance(threshold_info, float) else f'{threshold_info:.2f}'}")
 
         child_cell_ids = [c["id"] for c in hotspot_cells if c.get("id")]
 
         if not child_cell_ids:
             logger.warning("⚠️ WARNING: Hotspot cells have no IDs! Cannot check for existing analyses.")
             logger.warning("   This should not happen. Skipping AI analysis to prevent duplicates.")
-            logger.info("=" * 70)
+            logger.debug("=" * 70)
             return
 
-        logger.info(f"🔑 {len(child_cell_ids)} cells with valid IDs")
+        logger.debug(f"🔑 {len(child_cell_ids)} cells with valid IDs")
 
         cells_need_analysis = [c for c in hotspot_cells if c.get("analyzed") is True]
         cells_already_done = [c for c in hotspot_cells if c.get("analyzed") is False]
 
         if cells_already_done:
-            logger.info(f"✅ {len(cells_already_done)} cells already completed (analyzed=False)")
+            logger.debug(f"✅ {len(cells_already_done)} cells already completed (analyzed=False)")
 
         if not cells_need_analysis:
-            logger.info("✅ All hotspot cells already analyzed (no cells with analyzed=True)")
-            logger.info("=" * 70)
+            logger.debug("✅ All hotspot cells already analyzed (no cells with analyzed=True)")
+            logger.debug("=" * 70)
             return
 
-        logger.info(f"🆕 {len(cells_need_analysis)} cells need analysis (analyzed=True)")
+        logger.debug(f"🆕 {len(cells_need_analysis)} cells need analysis (analyzed=True)")
 
         hotspot_cells = cells_need_analysis
         child_cell_ids = [c["id"] for c in hotspot_cells if c.get("id")]
 
-        logger.info("🔍 Backup-Check: Prüfe cell_analyses Tabelle...")
+        logger.debug("🔍 Backup-Check: Prüfe cell_analyses Tabelle...")
         existing_analyses_response = supabase_service.client.table("cell_analyses").select(
             "child_cell_id"
         ).in_("child_cell_id", child_cell_ids).execute()
@@ -163,11 +161,11 @@ async def analyze_hotspot_cells_with_ai(
         existing_child_cell_ids = set()
         if existing_analyses_response.data:
             existing_child_cell_ids = {a["child_cell_id"] for a in existing_analyses_response.data}
-            logger.info(f"⚠️  Backup-Check fand {len(existing_child_cell_ids)} Zellen mit Analysen (sollte 0 sein!)")
+            logger.debug(f"⚠️  Backup-Check fand {len(existing_child_cell_ids)} Zellen mit Analysen (sollte 0 sein!)")
             if len(existing_child_cell_ids) > 0:
                 logger.warning("   Dies deutet auf ein Sync-Problem mit analyzed-Flag hin!")
         else:
-            logger.info("✅ Backup-Check: Keine Duplikate gefunden (gut!)")
+            logger.debug("✅ Backup-Check: Keine Duplikate gefunden (gut!)")
 
         hotspot_cells = [
             cell for cell in hotspot_cells if cell.get("id") not in existing_child_cell_ids
@@ -177,14 +175,14 @@ async def analyze_hotspot_cells_with_ai(
         if filtered_count > 0:
             logger.warning(f"⚠️  {filtered_count} cells durch Backup-Check gefiltert (Flag-Inkonsistenz!)")
         else:
-            logger.info(f"✅ Alle {len(hotspot_cells)} Zellen bereit für KI-Analyse")
+            logger.debug(f"✅ Alle {len(hotspot_cells)} Zellen bereit für KI-Analyse")
 
         if not hotspot_cells:
-            logger.info("✅ All hotspot cells already have analyses - no AI analysis needed!")
-            logger.info("=" * 70)
+            logger.debug("✅ All hotspot cells already have analyses - no AI analysis needed!")
+            logger.debug("=" * 70)
             return
 
-        logger.info(f"🆕 {len(hotspot_cells)} new hotspot cells need AI analysis")
+        logger.debug(f"🆕 {len(hotspot_cells)} new hotspot cells need AI analysis")
 
         for cell in hotspot_cells:
             lat1, lon1 = user_lat, user_lon
@@ -203,30 +201,39 @@ async def analyze_hotspot_cells_with_ai(
 
         if len(hotspot_cells) > max_cells:
             cells_to_analyze = random.sample(hotspot_cells, max_cells)
-            logger.info(f"🎲 Random selection: {max_cells} out of {len(hotspot_cells)} hotspot cells")
+            logger.debug(f"🎲 Random selection: {max_cells} out of {len(hotspot_cells)} hotspot cells")
         else:
             cells_to_analyze = hotspot_cells
-            logger.info(f"🎲 Analyzing all {len(hotspot_cells)} available hotspot cells")
+            logger.debug(f"🎲 Analyzing all {len(hotspot_cells)} available hotspot cells")
 
         cells_to_analyze_sorted = sorted(cells_to_analyze, key=lambda c: c["distance_to_user"])
 
-        logger.info(f"🎯 Starting AI analysis for {len(cells_to_analyze)} RANDOM cells (max: {max_cells}):")
+        logger.debug(f"🎯 Starting AI analysis for {len(cells_to_analyze)} RANDOM cells (max: {max_cells}):")
         for i, cell in enumerate(cells_to_analyze_sorted):
-            logger.info(
+            logger.debug(
                 f"   {i+1}. {cell['cell_id']}: Heat Score={cell['heat_score']:.1f}, "
                 f"Distance={cell['distance_to_user']:.0f}m"
             )
         if len(hotspot_cells) > max_cells:
-            logger.info(f"   ℹ️  {len(hotspot_cells) - max_cells} weitere Zellen warten auf zukünftige Random-Auswahl")
-        logger.info("=" * 70)
+            logger.debug(f"   ℹ️  {len(hotspot_cells) - max_cells} weitere Zellen warten auf zukünftige Random-Auswahl")
+        logger.debug("=" * 70)
         
         # 8. JETZT ERST: Analyze each cell with AI (nur wenn noch keine Analyse existiert)
         analyzed_count = 0
+        
+        # Importiere Progress Tracker
+        from app.services.progress_tracker import get_current_tracker
+        tracker = get_current_tracker()
+        
         for idx, cell in enumerate(cells_to_analyze):
             image_path = None  # Initialize for finally block
             
             try:
-                logger.info(f"\n--- Analyzing cell {idx+1}/{len(cells_to_analyze)}: {cell['cell_id']} ---")
+                # Progress über Tracker
+                if tracker:
+                    tracker.substep(f"🤖 Analyzing {idx+1}/{len(cells_to_analyze)}: {cell['cell_id']} (Heat={cell['heat_score']:.1f})")
+                else:
+                    logger.info(f"🤖 Analyzing {idx+1}/{len(cells_to_analyze)}: {cell['cell_id']} (Heat={cell['heat_score']:.1f})")
                 
                 # Call location_description_service (startet KI)
                 location_result = location_description_service.describe_location(
@@ -243,9 +250,9 @@ async def analyze_hotspot_cells_with_ai(
                 image_path = location_result['image_path']
                 ai_provider = location_result['ai_provider']
                 
-                logger.info(f"✅ AI Description ({len(description)} chars): {description[:80]}...")
-                logger.info(f"✅ Main Cause: {main_cause}")
-                logger.info(f"✅ Actions: {len(suggested_actions)} suggested")
+                logger.debug(f"✅ AI Description ({len(description)} chars): {description[:80]}...")
+                logger.debug(f"✅ Main Cause: {main_cause}")
+                logger.debug(f"✅ Actions: {len(suggested_actions)} suggested")
                 
                 # 9. Save to cell_analyses table
                 # Convert confidence to Float (high=0.9, medium=0.7, low=0.5)
@@ -265,8 +272,7 @@ async def analyze_hotspot_cells_with_ai(
                     'suggested_actions': suggested_actions,
                     'confidence': confidence_value,  # Float instead of String!
                     'image_url': None,  # Image not stored permanently
-                    'gemini_model': ai_provider,
-                    'mission_generated': False  # ✅ Initial: Noch keine Mission generiert
+                    'gemini_model': ai_provider
                 }
                 
                 response = supabase_service.client.table('cell_analyses').insert(analysis_data).execute()
@@ -278,7 +284,7 @@ async def analyze_hotspot_cells_with_ai(
                     # WICHTIG: analyzed = False → Analyse abgeschlossen
                     #          analyzed = True → Wartet noch auf Analyse
                     child_cell_uuid = cell['id']
-                    logger.info(f"   🔄 Setze analyzed=False für child_cell UUID: {child_cell_uuid}")
+                    logger.debug(f"   🔄 Setze analyzed=False für child_cell UUID: {child_cell_uuid}")
                     
                     # Update mit der richtigen UUID
                     update_response = supabase_service.client.table('child_cells').update({
@@ -286,20 +292,13 @@ async def analyze_hotspot_cells_with_ai(
                         'ai_analysis_id': analysis_id
                     }).eq('id', child_cell_uuid).execute()
                     
-                    # 10a. Verify: Lade die Zelle nochmal und prüfe ob analyzed=False
-                    verify_response = supabase_service.client.table('child_cells').select('id, cell_id, analyzed').eq('id', child_cell_uuid).execute()
-                    
-                    if verify_response.data and len(verify_response.data) > 0:
-                        verified_cell = verify_response.data[0]
-                        if verified_cell.get('analyzed') == False:
-                            logger.info(f"   ✅ VERIFIED: analyzed=False korrekt gesetzt für UUID {child_cell_uuid}!")
-                        else:
-                            logger.error(f"   ❌ FEHLER: analyzed={verified_cell.get('analyzed')} - sollte False sein!")
-                    else:
-                        logger.warning(f"   ⚠️ Konnte Zelle nicht verifizieren: {child_cell_uuid}")
-                    
                     analyzed_count += 1
-                    logger.info(f"✅ Cell {cell['cell_id']} successfully analyzed and saved! (analyzed=False)")
+                    
+                    # Success über Tracker
+                    if tracker:
+                        tracker.substep(f"   ✅ {cell['cell_id']} saved")
+                    else:
+                        logger.info(f"   ✅ Saved")
                 else:
                     logger.error(f"❌ cell_analyses insert fehlgeschlagen - keine data in response")
                 
@@ -329,21 +328,22 @@ async def analyze_hotspot_cells_with_ai(
                     try:
                         if os.path.exists(image_path):
                             os.remove(image_path)
-                            logger.info(f"🗑️  Satellite image deleted: {os.path.basename(image_path)}")
+                            logger.debug(f"🗑️  Satellite image deleted: {os.path.basename(image_path)}")
                     except Exception as e:
                         logger.warning(f"⚠️ Could not delete image: {e}")
         
-        logger.info("=" * 70)
-        logger.info(f"🎉 AI ANALYSIS COMPLETED: {analyzed_count}/{len(cells_to_analyze)} cells successfully analyzed")
-        logger.info("=" * 70)
+        logger.debug("=" * 70)
+        if not tracker:
+            logger.info(f"✅ {analyzed_count}/{len(cells_to_analyze)} Zellen analysiert")
+        logger.debug("=" * 70)
         
         # 12. Automatic Mission Generation (if user_id provided)
         # This runs ALWAYS when user_id is present, not only after new analyses
         # The service checks internally which analyses don't have missions yet
         if user_id:
-            logger.info("\n" + "=" * 70)
-            logger.info("🎯 Checking for missions to generate...")
-            logger.info(f"   (Checking all analyses in parent_cell for missing missions)")
+            logger.debug("\n" + "=" * 70)
+            logger.debug("🎯 Checking for missions to generate...")
+            logger.debug(f"   (Checking all analyses in parent_cell for missing missions)")
             try:
                 missions = await mission_generation_service.generate_missions_from_analyses(
                     parent_cell_id=parent_cell_id,
@@ -353,12 +353,12 @@ async def analyze_hotspot_cells_with_ai(
                     max_missions=10  # Generate up to 10 missions
                 )
                 if len(missions) > 0:
-                    logger.info(f"✅ {len(missions)} new missions automatically generated!")
+                    logger.debug(f"✅ {len(missions)} new missions automatically generated!")
                 else:
-                    logger.info(f"ℹ️  No new missions generated (all analyses already have missions)")
+                    logger.debug(f"ℹ️  No new missions generated (all analyses already have missions)")
             except Exception as e:
                 logger.error(f"⚠️ Error during mission generation: {e}")
-            logger.info("=" * 70)
+            logger.debug("=" * 70)
         
     except Exception as e:
         logger.error(f"❌ Error in automatic hotspot analysis: {e}", exc_info=True)
@@ -924,12 +924,11 @@ async def scan_on_login(
     🚀 SCAN ON LOGIN - MIT ANTI-ENDLESS-LOOP PROTECTION
     """
     try:
-        logger.info("=" * 70)
-        logger.info("🚀 SCAN ON LOGIN (MIT LOOP-PROTECTION)")
-        logger.info(f"   User: {user_id}")
-        logger.info("=" * 70)
+        # Initialisiere Progress Tracker
+        progress = ScanProgressTracker(user_id)
         
         # 0. ANTI-ENDLESS-LOOP: Prüfe TODAY'S ANALYSES zuerst!
+        progress.step("Check Daily Limit", "🛡️")
         from datetime import datetime
         today = datetime.now().date()
         
@@ -938,11 +937,12 @@ async def scan_on_login(
         ).eq("user_id", user_id).gte("created_at", f"{today}T00:00:00").execute()
         
         today_analyses_count = len(today_analyses_response.data) if today_analyses_response.data else 0
-        logger.info(f"📊 {today_analyses_count} KI-Analysen von User {user_id} HEUTE")
+        progress.substep(f"{today_analyses_count}/2 Analyses today")
         
         # ANTI-ENDLESS-LOOP: MAX 2 Analysen pro Tag!
         if today_analyses_count >= 2:
-            logger.info("✅ MAXIMUM ERREICHT: User hat bereits 2 Analysen heute - überspringe KI-Analyse")
+            progress.info("Tageslimit erreicht - überspringe KI-Analyse")
+            progress.success("Scan abgeschlossen (Limit erreicht)")
             return JSONResponse(content={
                 "success": True,
                 "message": "Tageslimit erreicht - bereits 2 Analysen heute",
@@ -950,23 +950,26 @@ async def scan_on_login(
             })
         
         # 1. Prüfe ob Parent-Cell existiert
+        progress.step("Search Parent-Cell in DB", "🔍")
         parent_cell = await parent_cell_service.find_existing_parent_cell(latitude, longitude)
         child_cells = []
         
         if parent_cell:
-            logger.info(f"✅ Parent Cell bereits vorhanden: {parent_cell['id']}")
+            progress.substep(f"✓ Found! {parent_cell['child_cells_count']} Cells")
             # ✅ BUG FIX #9: Lade nur Hotspots (analyzed=True) für Performance
             # Verhindert Supabase 1000-Zeilen-Limit bei großen Parent-Cells
             child_cells = await parent_cell_service.load_child_cells(parent_cell['id'], only_hotspots=True)
-            logger.info(f"📊 {len(child_cells)} Hotspot-Zellen geladen (analyzed=True)")
+            progress.substep(f"✓ {len(child_cells)} Hotspots loaded")
             
             if len(child_cells) == 0:
-                logger.info("ℹ️  Keine Hotspots mit analyzed=True gefunden - alle bereits analysiert!")
+                progress.substep("Alle Hotspots bereits analysiert")
                 parent_cell = None
+        else:
+            progress.substep("Nicht gefunden - neuer Scan nötig")
         
         # Neuer Scan wenn nötig...
         if not parent_cell or len(child_cells) == 0:
-            logger.info("🔄 Keine Parent-Cell im Cache → starte neuen Login-Scan...")
+            progress.step("Starte neuen Gebietsscan", "📡")
             
             lat_offset = radius_m / 111000
             lon_offset = radius_m / (111000 * math.cos(math.radians(latitude)))
@@ -984,13 +987,15 @@ async def scan_on_login(
                 cell_size_m=30
             )
             
-            logger.info(f"   Grid erstellt: {len(grid_cells)} Zellen (30m × 30m)")
+            progress.substep(f"Grid erstellt: {len(grid_cells)} Zellen (30m)")
             
             grid_results, landsat_scene_id, ndvi_source = grid_service.calculate_grid_heat_scores_batch(
                 grid_cells=grid_cells,
                 scene_id=None,
                 max_cells=10000
             )
+            
+            progress.substep(f"Heat Scores berechnet ({ndvi_source})")
             
             parent_cell = await parent_cell_service.create_parent_cell(
                 lat=latitude,
@@ -1004,23 +1009,26 @@ async def scan_on_login(
                 grid_cells=grid_results
             )
             
+            progress.substep(f"In DB gespeichert")
             child_cells = saved_cells
+        else:
+            progress.step("Cache-Hit - Skip Scan", "⚡")
         
         # 2. STRENGE ANTI-ENDLESS-LOOP: MAXIMAL 2 Analysen pro Tag!
+        progress.step("Calculate Available Analyses", "🧮")
         remaining_daily_analyses = 2 - today_analyses_count
-        # ✅ BUG FIX #5: Verwende verbleibendes Limit korrekt
-        # Wenn User bereits 1 Analyse hat, kann er nur noch 1 weitere machen
         max_cells_to_analyze = remaining_daily_analyses
         
         if max_cells_to_analyze <= 0:
-            logger.info("✅ TAGESLIMIT: Bereits 2 Analysen heute - überspringe KI-Analyse")
+            progress.info("Tageslimit bereits erreicht")
             missions_count = 0
             missions_generated = 0
         else:
             # Begrenze auf MAX_CELLS_ANALYSIS als absolute Obergrenze
             max_cells_to_analyze = min(max_cells_to_analyze, MAX_CELLS_ANALYSIS)
-            logger.info(f"🤖 Starte KI-Analyse: {max_cells_to_analyze} Zellen (verbleibend heute: {remaining_daily_analyses})")
+            progress.substep(f"Analyze max. {max_cells_to_analyze} Cells")
             
+            progress.step("Start AI Analysis", "🤖")
             await analyze_hotspot_cells_with_ai(
                 saved_cells=child_cells,
                 parent_cell_id=parent_cell['id'],
@@ -1033,6 +1041,7 @@ async def scan_on_login(
             # ✅ BUG FIX #3: Mission-Generierung erfolgt bereits in analyze_hotspot_cells_with_ai()!
             # Kein doppelter Aufruf mehr nötig. Die Funktion ruft intern generate_missions_from_analyses() auf.
             
+            progress.step("Count Generated Missions", "📊")
             # Zähle die tatsächlich generierten Missionen aus der DB
             missions_response = supabase_service.client.table('missions').select(
                 'id'
@@ -1040,6 +1049,10 @@ async def scan_on_login(
             
             missions_count = len(missions_response.data) if missions_response.data else 0
             missions_generated = max_cells_to_analyze
+            progress.substep(f"{missions_count} Missions found")
+        
+        # Success!
+        progress.success(f"{missions_count} new Missions created!")
         
         return JSONResponse(content={
             "success": True,

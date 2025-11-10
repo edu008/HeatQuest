@@ -17,7 +17,11 @@ class MissionGenerationService:
     """Service für automatische Mission-Generierung."""
     
     def __init__(self):
-        self.min_heat_score_for_mission = 11.0  # Nur Hotspots
+        # ✅ BUG FIX #10: Reduziere Threshold für kühlere Klimazonen
+        # Vorher: 11.0 (zu hoch für UK/Bristol)
+        # Nachher: 0.0 (alle Analysen werden zu Missionen, da sie bereits als Hotspots erkannt wurden)
+        # Die Hotspot-Erkennung erfolgt bereits beim Speichern der Child-Cells mit adaptiver Methode!
+        self.min_heat_score_for_mission = 0.0  # Alle analysierten Zellen sind bereits Hotspots
         self.max_missions_per_generation = 10
     
     async def generate_missions_from_analyses(
@@ -42,12 +46,12 @@ class MissionGenerationService:
             Liste von erstellten Missionen
         """
         try:
-            logger.info("=" * 70)
-            logger.info(f"🎯 MISSION GENERATION")
-            logger.info(f"   Parent Cell: {parent_cell_id}")
-            logger.info(f"   User: {user_id}")
-            logger.info(f"   Max Missions: {max_missions}")
-            logger.info("=" * 70)
+            logger.debug("=" * 70)
+            logger.debug(f"🎯 MISSION GENERATION")
+            logger.debug(f"   Parent Cell: {parent_cell_id}")
+            logger.debug(f"   User: {user_id}")
+            logger.debug(f"   Max Missions: {max_missions}")
+            logger.debug("=" * 70)
             
             # 1. Load all analyses for this Parent Cell
             response = supabase_service.client.table('cell_analyses').select(
@@ -55,11 +59,11 @@ class MissionGenerationService:
             ).eq('parent_cell_id', parent_cell_id).execute()
             
             if not response.data or len(response.data) == 0:
-                logger.info("ℹ️  No cell analyses found for mission generation")
+                logger.debug("ℹ️  No cell analyses found for mission generation")
                 return []
             
             analyses = response.data
-            logger.info(f"📊 {len(analyses)} cell analyses found")
+            logger.debug(f"📊 {len(analyses)} cell analyses found")
             
             # 2. Filter: Only analyses with Heat Score >= Threshold
             hotspot_analyses = [
@@ -68,34 +72,15 @@ class MissionGenerationService:
             ]
             
             if not hotspot_analyses:
-                logger.info(f"ℹ️  No hotspots (>= {self.min_heat_score_for_mission}) found")
+                logger.debug(f"ℹ️  No hotspots (>= {self.min_heat_score_for_mission}) found")
                 return []
             
-            logger.info(f"🔥 {len(hotspot_analyses)} hotspot analyses found")
+            logger.debug(f"🔥 {len(hotspot_analyses)} hotspot analyses found")
             
-            # 2a. ERSTE PRÜFUNG: Welche haben bereits mission_generated = True?
-            # Dies ist die primäre Prüfung (ähnlich wie analyzed Flag bei child_cells)
-            already_generated = [a for a in hotspot_analyses if a.get('mission_generated') == True]
-            not_generated = [a for a in hotspot_analyses if a.get('mission_generated') != True]
-            
-            if already_generated:
-                logger.info(f"✅ {len(already_generated)} analyses already have mission_generated=True")
-            
-            if not not_generated:
-                logger.info("✅ All analyses already have missions generated (mission_generated=True)")
-                return []
-            
-            logger.info(f"🆕 {len(not_generated)} analyses without mission_generated flag")
-            
-            # Verwende nur die Analysen ohne Flag
-            hotspot_analyses = not_generated
-            
-            # 3. ZWEITE PRÜFUNG (Backup, user-spezifisch): Check existing missions for THIS user
-            # Die mission_generated Flag (Prüfung oben) ist global
-            # Diese Prüfung ist user-spezifisch als zusätzliche Sicherheit
+            # 3. Check existing missions for THIS user
             analysis_ids = [a['id'] for a in hotspot_analyses]
             
-            logger.info(f"🔍 Backup-Check: Existing missions for user {user_id}...")
+            logger.debug(f"🔍 Check: Existing missions for user {user_id}...")
             existing_missions_response = supabase_service.client.table('missions').select(
                 'cell_analysis_id'
             ).in_('cell_analysis_id', analysis_ids).eq('user_id', user_id).execute()
@@ -103,21 +88,28 @@ class MissionGenerationService:
             existing_analysis_ids = set()
             if existing_missions_response.data:
                 existing_analysis_ids = {m['cell_analysis_id'] for m in existing_missions_response.data}
-                logger.info(f"   ✅ {len(existing_analysis_ids)} analyses already have missions for this user")
+                logger.debug(f"   ✅ {len(existing_analysis_ids)} analyses already have missions for this user")
             else:
-                logger.info(f"   ℹ️  No existing missions found for this user")
+                logger.debug(f"   ℹ️  No existing missions found for this user")
             
-            # Filter analyses that don't have missions yet
+            # Filter analyses that don't have missions yet for THIS user
             new_analyses = [
                 a for a in hotspot_analyses
                 if a['id'] not in existing_analysis_ids
             ]
             
             if not new_analyses:
-                logger.info("✅ All hotspots already have missions for this user - no new missions needed")
+                logger.debug("✅ All hotspots already have missions for this user - no new missions needed")
                 return []
             
-            logger.info(f"🆕 {len(new_analyses)} new hotspots without mission for this user")
+            # Progress über Tracker
+            from app.services.progress_tracker import get_current_tracker
+            tracker = get_current_tracker()
+            
+            if tracker:
+                tracker.substep(f"🎯 Creating {len(new_analyses)} new Missions...")
+            else:
+                logger.info(f"🆕 Creating {len(new_analyses)} new Missions")
             
             # 4. Calculate distances to user
             for analysis in new_analyses:
@@ -133,9 +125,9 @@ class MissionGenerationService:
             # 6. Limit to max_missions
             analyses_to_create = new_analyses[:max_missions]
             
-            logger.info(f"🎯 Creating {len(analyses_to_create)} new missions:")
+            logger.debug(f"🎯 Creating {len(analyses_to_create)} new missions:")
             for i, analysis in enumerate(analyses_to_create):
-                logger.info(f"   {i+1}. Heat Score={analysis['heat_score']:.1f}, Distance={analysis['distance_to_user']:.0f}m")
+                logger.debug(f"   {i+1}. Heat Score={analysis['heat_score']:.1f}, Distance={analysis['distance_to_user']:.0f}m")
             
             # 7. Create missions
             created_missions = []
@@ -147,25 +139,20 @@ class MissionGenerationService:
                     )
                     if mission:
                         created_missions.append(mission)
-                        logger.info(f"✅ Mission created: {mission['title']}")
+                        if tracker:
+                            tracker.substep(f"   ✅ {mission['title']}")
+                        else:
+                            logger.info(f"   ✅ {mission['title']}")
                         
-                        # 7a. Setze mission_generated = True in cell_analyses
-                        # WICHTIG: Dies markiert die Analyse als "Mission wurde generiert"
-                        try:
-                            supabase_service.client.table('cell_analyses').update({
-                                'mission_generated': True
-                            }).eq('id', analysis['id']).execute()
-                            logger.info(f"   ✓ cell_analysis {analysis['id']} marked as mission_generated=True")
-                        except Exception as update_error:
-                            logger.warning(f"⚠️ Could not update mission_generated flag: {update_error}")
-                            
                 except Exception as e:
                     logger.error(f"❌ Error creating mission: {e}")
                     continue
             
-            logger.info("=" * 70)
-            logger.info(f"🎉 MISSIONS CREATED: {len(created_missions)}/{len(analyses_to_create)}")
-            logger.info("=" * 70)
+            if tracker:
+                tracker.substep(f"✅ {len(created_missions)}/{len(analyses_to_create)} Missions created")
+            else:
+                logger.info(f"✅ {len(created_missions)}/{len(analyses_to_create)} Missions created")
+            logger.debug("=" * 70)
             
             return created_missions
         
