@@ -189,21 +189,37 @@ class ParentCellService:
     
     async def load_child_cells(
         self, 
-        parent_cell_id: str
+        parent_cell_id: str,
+        only_hotspots: bool = False
     ) -> List[Dict]:
         """
-        Lädt alle Child-Cells einer Parent-Cell aus der DB.
+        Lädt Child-Cells einer Parent-Cell aus der DB.
         
         Args:
             parent_cell_id: Parent-Cell-ID
+            only_hotspots: Wenn True, lade nur Zellen mit analyzed=True (Performance-Optimierung)
         
         Returns:
             Liste von Child-Cells
         """
         try:
-            logger.info(f"📥 Lade Child-Cells für Parent {parent_cell_id}...")
-            
-            response = supabase_service.client.table('child_cells').select('*').eq('parent_cell_id', parent_cell_id).execute()
+            if only_hotspots:
+                logger.info(f"📥 Lade Hotspot-Cells (analyzed=True) für Parent {parent_cell_id}...")
+                # ✅ BUG FIX #9: Lade nur Hotspots, verhindert Supabase 1000-Zeilen-Limit
+                response = supabase_service.client.table('child_cells')\
+                    .select('*')\
+                    .eq('parent_cell_id', parent_cell_id)\
+                    .eq('analyzed', True)\
+                    .execute()
+            else:
+                logger.info(f"📥 Lade alle Child-Cells für Parent {parent_cell_id}...")
+                # WARNUNG: Supabase gibt standardmäßig nur 1000 Zeilen zurück!
+                # Für große Parent-Cells (>1000 Zellen) könnte Pagination nötig sein
+                response = supabase_service.client.table('child_cells')\
+                    .select('*')\
+                    .eq('parent_cell_id', parent_cell_id)\
+                    .limit(2000)\
+                    .execute()
             
             child_cells = response.data or []
             logger.info(f"✅ {len(child_cells)} Child-Cells geladen")

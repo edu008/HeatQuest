@@ -949,16 +949,19 @@ async def scan_on_login(
                 "ai_analysis_performed": False
             })
         
-        # 1. Restlicher Code bleibt gleich...
+        # 1. Prüfe ob Parent-Cell existiert
         parent_cell = await parent_cell_service.find_existing_parent_cell(latitude, longitude)
         child_cells = []
         
         if parent_cell:
             logger.info(f"✅ Parent Cell bereits vorhanden: {parent_cell['id']}")
-            child_cells = await parent_cell_service.load_child_cells(parent_cell['id'])
-            logger.info(f"📊 {len(child_cells)} existierende Child Cells geladen")
+            # ✅ BUG FIX #9: Lade nur Hotspots (analyzed=True) für Performance
+            # Verhindert Supabase 1000-Zeilen-Limit bei großen Parent-Cells
+            child_cells = await parent_cell_service.load_child_cells(parent_cell['id'], only_hotspots=True)
+            logger.info(f"📊 {len(child_cells)} Hotspot-Zellen geladen (analyzed=True)")
             
             if len(child_cells) == 0:
+                logger.info("ℹ️  Keine Hotspots mit analyzed=True gefunden - alle bereits analysiert!")
                 parent_cell = None
         
         # Neuer Scan wenn nötig...
@@ -1005,37 +1008,38 @@ async def scan_on_login(
         
         # 2. STRENGE ANTI-ENDLESS-LOOP: MAXIMAL 2 Analysen pro Tag!
         remaining_daily_analyses = 2 - today_analyses_count
-        max_cells_to_analyze = min(MAX_CELLS_ANALYSIS, remaining_daily_analyses)
+        # ✅ BUG FIX #5: Verwende verbleibendes Limit korrekt
+        # Wenn User bereits 1 Analyse hat, kann er nur noch 1 weitere machen
+        max_cells_to_analyze = remaining_daily_analyses
         
         if max_cells_to_analyze <= 0:
             logger.info("✅ TAGESLIMIT: Bereits 2 Analysen heute - überspringe KI-Analyse")
             missions_count = 0
             missions_generated = 0
         else:
-            logger.info(f"🤖 Starte KI-Analyse: {max_cells_to_analyze} Zellen")
+            # Begrenze auf MAX_CELLS_ANALYSIS als absolute Obergrenze
+            max_cells_to_analyze = min(max_cells_to_analyze, MAX_CELLS_ANALYSIS)
+            logger.info(f"🤖 Starte KI-Analyse: {max_cells_to_analyze} Zellen (verbleibend heute: {remaining_daily_analyses})")
             
             await analyze_hotspot_cells_with_ai(
                 saved_cells=child_cells,
                 parent_cell_id=parent_cell['id'],
                 user_lat=latitude,
                 user_lon=longitude,
-                user_id=user_id,  # WICHTIG: User-ID mitgeben!
+                user_id=user_id,  # WICHTIG: User-ID mitgeben für automatische Mission-Generierung!
                 detection_method=None,
                 max_cells=max_cells_to_analyze
             )
-            missions_generated = max_cells_to_analyze
+            # ✅ BUG FIX #3: Mission-Generierung erfolgt bereits in analyze_hotspot_cells_with_ai()!
+            # Kein doppelter Aufruf mehr nötig. Die Funktion ruft intern generate_missions_from_analyses() auf.
             
-            if missions_generated > 0:
-                missions = await mission_generation_service.generate_missions_from_analyses(
-                    parent_cell_id=parent_cell['id'],
-                    user_id=user_id,
-                    user_lat=latitude,
-                    user_lon=longitude,
-                    max_missions=5
-                )
-                missions_count = len(missions)
-            else:
-                missions_count = 0
+            # Zähle die tatsächlich generierten Missionen aus der DB
+            missions_response = supabase_service.client.table('missions').select(
+                'id'
+            ).eq('user_id', user_id).eq('parent_cell_id', parent_cell['id']).execute()
+            
+            missions_count = len(missions_response.data) if missions_response.data else 0
+            missions_generated = max_cells_to_analyze
         
         return JSONResponse(content={
             "success": True,
