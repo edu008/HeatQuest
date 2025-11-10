@@ -73,7 +73,7 @@ VERTEX_AI_CREDENTIALS=vertex-access.json
 **Terminal 1 - Backend:**
 ```bash
 cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload
 ```
 
 **Terminal 2 - Frontend:**
@@ -81,40 +81,10 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 npm run dev
 ```
 
- ##⏱️ First-run note: The backend analyzes all child cells in the selected area on the initial launch. This initial satellite data processing (heat score + AI) can take few minutes before missions appear. Thanks to the smart cache, subsequent scans run almost in real time.
+ ⏱️ First-run note: The backend analyzes all child cells in the selected area on the initial launch. This initial satellite data processing (heat score + AI) can take few minutes before missions appear. Thanks to the smart cache, subsequent scans run almost in real time.
 
-### Access:
-- 🌐 **Frontend:** http://localhost:5173
-- 📡 **Backend API:** http://localhost:8000/docs
-- 🗄️ **Supabase Studio:** https://supabase.com/dashboard/project/your-project-id
 
----
-
-## 🌍 Deployment (Online)
-
-### Option 1: Quick Deployment for Prototype
-
-#### Frontend → Lovable (1 Click)
-1. Open: https://lovable.dev/projects/dc5dbd94-f3c3-43e8-ab29-0a3f066a9206
-2. Click **"Share" → "Publish"**
-3. Done! You'll get a public URL
-
-#### Backend → Render.com (Free)
-1. Go to: https://render.com
-2. Create a **Web Service**
-3. Connect your repository
-4. Configuration:
-   - **Build Command:** `cd backend && pip install -r requirements.txt`
-   - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - **Root Directory:** `backend`
-5. Add environment variables:
-   - `MAP` = Your Mapbox Token
-   - `AWS_REGION` = us-west-2
-6. Click **"Create Web Service"**
-
----
-
-### Option 2: Professional Deployment
+### Deployment
 
 #### Frontend → Vercel
 ```bash
@@ -255,7 +225,7 @@ HeatQuest/
 │   └── vertex-access.json       # Google Cloud Credentials
 │
 ├── database/
-│   └── supabase_schema_mit_parent_child.sql  # Database Schema
+│   └── supabase_schema  # Database Schema
 │
 └── README.md
 ```
